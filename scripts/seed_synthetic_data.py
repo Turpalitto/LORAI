@@ -4,6 +4,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 from app.ingestion.pipeline import detect_sections, chunk_text
 from app.knowledge_base import repository as repo
 from app.knowledge_base.vector_store import VectorStore
+from app.core.config import settings
+persist = settings.CHROMA_DIR
 import uuid
 SYNTH = [
     {"nosology": "Острый средний отит", "icd": ["H66.9"],
@@ -24,6 +26,6 @@ for s in SYNTH:
         "_chunks": chunk_text(s["text"], {"section": "general", "page_range": [1]}),
         "_full_text": s["text"]}
     repo.save_document(doc)
-    VectorStore().add(doc["_chunks"], {"title": doc["title"], "nosology": doc["nosology"],
+    VectorStore(persist).add(doc["_chunks"], {"title": doc["title"], "nosology": doc["nosology"],
         "document": doc["title"], "icd10_codes": ",".join(doc["icd10_codes"])})
     print("SEED OK:", doc["nosology"])

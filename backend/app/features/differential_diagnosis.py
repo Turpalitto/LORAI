@@ -7,10 +7,26 @@
 эта нозология на первом месте».
 """
 import math
+import re
 
 
 def _hay(p: dict) -> str:
     return (str(p.get("sections", "")) + " " + p.get("nosology", "")).lower()
+
+
+def _tok(s: str) -> list[str]:
+    return [t for t in re.findall(r"[а-яa-z0-9]+", (s or "").lower()) if len(t) >= 4]
+
+
+def _matches(symptom: str, hay: str) -> bool:
+    """Токенное совпадение: хватило половины значимых слов симптома.
+    Точная фраза («тризм жевательных мышц») редко дословно есть в тексте
+    («тризм жевательной мускулатуры»), а слова — есть."""
+    toks = _tok(symptom)
+    if not toks:
+        return symptom.lower() in hay
+    need = max(1, len(toks) // 2)
+    return sum(1 for t in toks if t in hay) >= need
 
 
 def rank(symptoms: list[str], protocols: list[dict]) -> list[dict]:
@@ -21,11 +37,11 @@ def rank(symptoms: list[str], protocols: list[dict]) -> list[dict]:
     N = len(protocols)
     weights = {}
     for s in syms:
-        df = sum(1 for h in hays if s.lower() in h)
+        df = sum(1 for h in hays if _matches(s, h))
         weights[s] = math.log(1 + N / (1 + df)) if df else math.log(1 + N)
     res = []
     for p, hay in zip(protocols, hays):
-        hits = [s for s in syms if s.lower() in hay]
+        hits = [s for s in syms if _matches(s, hay)]
         if not hits:
             continue
         score = sum(weights[s] for s in hits)

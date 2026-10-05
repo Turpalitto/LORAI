@@ -23,3 +23,24 @@
 3. MockLLM по умолчанию: end-to-end тест без ключа; замена — только .env.
 4. SQLite по умолчанию: запуск без Docker врачу; Postgres — в compose.
 5. Таблицы доз — только rule-based, не в LLM (защита цифр).
+
+## #20 (2026-10-05, ROADMAP п.4): TF-IDF остаётся бэкендом по умолчанию
+- Факт: Chroma 1.5.9 + дефолтный ONNX all-MiniLM-L6-v2 (en-модель) на русских КР даёт сжатые скоры 0.4–0.7 без разделения релевантных/нерелевантных; топ по «тризм» — Меньера вместо паратонзиллярного абсцесса. TF-IDF на тех же запросах точнее.
+- Решение: `VECTOR_BACKEND=tfidf|chroma` (config.py + vector_store.py), default `tfidf`. Chroma включается явно и покрыта тестом. Путь к multilingual: `EMBEDDING_MODEL=intfloat/multilingual-e5-base` — требует torch/sentence-transformers, не ставился в сессии (тяжёлый).
+- Побочка переиндексации: повторный ingest задвоил SQLite до 44 (document_id недетерминирован) — почищено до 22. ingest без --clean опасен повторами.
+
+## #21 (2026-10-05): rank дифдиагностики — токенное совпадение
+- Дефект: `rank` требовал точное вхождение целой фразы симптома; «тризм жевательных мышц» не совпал с текстом «тризм жевательной мускулатуры» → ranked пуст.
+- Фикс: `_matches` — хватило половины значимых слов (len>=4). Тест `test_diff_rank_token_match_phrase_not_verbatim`. Live: тризм → паратонзиллярный абсцесс первым.
+
+## #22 (2026-10-05, ROADMAP п.7): Docker — BLOCKED, нет CLI
+- Факт: `docker` отсутствует в системе полностью (не только daemon off); brew/apt нет, установка Docker Desktop — вне сессии. docker-compose.yml в репо есть, `compose up` не проверялся.
+- Решение: пункт остаётся BLOCKED до установки Docker Desktop пользователем; локальный запуск — через scripts/run_local.sh (проверен).
+
+## #23 (2026-10-05, ROADMAP п.8): Real LLM — ждёт ключ
+- Факт: код поддерживает `LLM_PROVIDER=openai + LLM_API_KEY` (.env.example), по умолчанию MockLLM. Ключа в сессии нет.
+- Решение: переключение — только .env, без правок кода. До ключа MockLLM остаётся дефолтом (все проверки 48/48 + e2e 7/7 на нём).
+
+## #24 (2026-10-05, ROADMAP п.5/6): OCR PARTIAL, Playwright DONE
+- OCR: pdf_loader `_ocr_fallback` + pipeline `failed/needs_manual_review` + test_ocr.py (синтетический скан). Без tesseract сканы помечаются, а не теряются. Для текста нужен `brew install tesseract tesseract-lang`.
+- Playwright: e2e.smoke.spec.ts 7/7 PASS против live :8000; e2e.ci.spec.ts 4/4 на синтетике (seed_synthetic_data.py); CI-job e2e в ci.yml. Спеки бьют по API (быстро, 590мс), не по UI-кликам — полный UI-coverage при наличии времени.

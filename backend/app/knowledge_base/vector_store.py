@@ -7,11 +7,14 @@ class VectorStore:
     def __init__(self, persist_dir: str = "./data/vector_store"):
         self.dir = persist_dir; os.makedirs(persist_dir, exist_ok=True)
         self.chroma = None
-        try:
-            import chromadb
-            self.chroma = chromadb.PersistentClient(path=persist_dir).get_or_create_collection("lorai")
-        except Exception:
-            self.chroma = None
+        # Бэкенд выбирается явно: VECTOR_BACKEND=chroma.
+        # По умолчанию TF-IDF: на русских КР точнее en-MiniLM (см. DECISIONS #20).
+        if os.getenv("VECTOR_BACKEND", "tfidf") == "chroma":
+            try:
+                import chromadb
+                self.chroma = chromadb.PersistentClient(path=persist_dir).get_or_create_collection("lorai")
+            except Exception:
+                self.chroma = None
         self.docs: list[dict] = []
         self._toks: list[list[str]] = []
         self._df: Counter = Counter()

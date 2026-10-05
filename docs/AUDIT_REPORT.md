@@ -55,3 +55,19 @@ upload→search→chat(6 источников)→dosage 900мг→checklist→te
 - VectorStore без delete: удалённые документы оставляют чанки (добавить tombstone/GC).
 - search_protocols — full scan 22×60k (при росте корпуса нужен FTS-индекс).
 - Threshold 0.12 валиден только для TF-IDF; при embeddings вернуть 0.75.
+
+# АУДИТ-4 (2026-10-05, живой стенд :8000, 22 docs / 1599 chunks)
+## Блоки 1–3 — PASS с замечаниями
+1. Окружение: /health ok (mock, 22/1599); Docker daemon OFF — compose не поднят (KNOWN_ISSUES); run_local.sh/.bat в scripts/; .env.example покрывает все settings.
+2. Данные: ингест 22/22; OCR PARTIAL (tesseract нет, pipeline честно маркирует failed + needs_manual_review).
+3. Миграции: создан 0002_feedback (таблицы documents/feedback/query_log/favorites upgrade 0001→head ok); login admin/doctor ok.
+## Блок 4 — PASS + 1 дефект (исправлен)
+In-data отвечает с источниками; инфаркт → честный отказ. Дефект: вопрос о дозе без слов-нозологий отказывал (score 0.146, в LOR_MARKERS не было лекарственной лексики) → исправлено anti_hallucination.py (лекарства + доза/дозировка/мг-кг/ребёнок/детск/педиатр), live: доза→needs_clarification, инфаркт→отказ. Регресс-тест test_audit4_dosage_without_nosology_clarifies. Попутно вскрыта порядковая зависимость тестов (сид не индексировался в VectorStore) → conftest индексирует сид.
+## Блок 5 — PASS
+Все модули 200: dosage/checklist/diff-diagnosis/referral-check/history/templates/discharge/related/contradictions(auth)/drug-check(auth)/favorites/stats/centor/pta. /search-protocol llm_used=False всегда (обхода LLM нет).
+## Блок 6 — PASS
+401 без токена, 403 врач→/admin/*, .exe-под-PDF → чистая 400; прод не загрязнён (upload настоящего файла пропущен сознательно — нет DELETE документов).
+## Блок 7/10/11 mobile — BLOCKED (нет Flutter SDK, DECISIONS #15)
+## Блок 8 — BLOCKED (Playwright-браузеры не ставились)
+## Дополнительно: rate-limit 30×200+429 ok; дисклеймер во всех ответах; ПДн-баннер в чате; README точен.
+## Итог: pytest 45/45, tsc clean, vitest 2/2, прод 22 docs цел.

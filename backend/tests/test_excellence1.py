@@ -34,6 +34,19 @@ def test_chat_returns_clarifying_question():
     assert "session_id" in j
 
 
+def test_audit4_dosage_without_nosology_clarifies():
+    """Аудит-4: вопрос про дозу БЕЗ слов-нозологий («отит», «ухо»)
+    не должен уходить в отказ — домен-гейт пропускает лекарства/
+    дозировочную лексику, дальше работает уточнение."""
+    c = _client()
+    j = c.post("/chat", json={"query": "Какая доза амоксициллина ребенку?"}).json()
+    assert j.get("refused") is False
+    assert j.get("needs_clarification") is True
+    # а чужая специальность по-прежнему честно отклоняется
+    j2 = c.post("/chat", json={"query": "Лечение инфаркта миокарда протокол"}).json()
+    assert j2.get("refused") is True
+
+
 def test_session_memory_expands_followup():
     from app.rag.sessions import expand_query, remember
     sid = "test-sess-1"

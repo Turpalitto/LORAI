@@ -99,3 +99,35 @@ def test_diff_diagnosis_has_red_flags():
     assert any(f["id"] == "stridor" for f in r["red_flags"])
     r2 = c.post("/diff-diagnosis", json={"symptoms": ["насморк"]}).json()
     assert r2["red_flags"] == [] and "ranked" in r2
+
+
+def test_diff_rank_token_match_phrase_not_verbatim():
+    """Фраза symptom'а не обязана быть дословно в тексте: хватило слов."""
+    from app.features import differential_diagnosis as dd
+    pros = [
+        {"nosology": "Паратонзиллярный абсцесс", "title": "Паратонзиллярный абсцесс",
+         "icd10_codes": ["J36"],
+         "sections": {"Клиника": "Тризм жевательной мускулатуры, боль в горле"}},
+        {"nosology": "Ринит", "title": "Ринит", "icd10_codes": ["J30"],
+         "sections": {"Клиника": "Заложенность носа, чихание"}},
+    ]
+    r = dd.rank(["тризм жевательных мышц", "боль при глотании"], pros)
+    assert r and r[0]["nosology"] == "Паратонзиллярный абсцесс"
+    assert "why_first" in r[0]
+
+
+def test_vector_backend_switch(tmp_path, monkeypatch):
+    """VECTOR_BACKEND=chroma включает Chroma, default — TF-IDF."""
+    import os
+    from app.knowledge_base import vector_store as vsm
+    monkeypatch.setenv("VECTOR_BACKEND", "chroma")
+    vs = vsm.VectorStore(persist_dir=str(tmp_path / "c1"))
+    assert vs.chroma is not None
+    vs.add([{"text": "Тризм жевательной мускулатуры при абсцессе", "section": "Клиника"}],
+           {"title": "Паратонзиллярный абсцесс", "document": "Паратонзиллярный абсцесс",
+            "nosology": "Паратонзиллярный абсцесс", "icd10_codes": "J36"})
+    r = vs.search("тризм", k=1)
+    assert r and "Паратонзиллярный" in r[0].get("document", "")
+    monkeypatch.delenv("VECTOR_BACKEND")
+    vs2 = vsm.VectorStore(persist_dir=str(tmp_path / "c2"))
+    assert vs2.chroma is None

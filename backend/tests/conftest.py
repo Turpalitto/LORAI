@@ -32,13 +32,14 @@ def _seed_minimal_docs():
     text = (
         "Определение\nОстрое воспаление среднего уха H66.9.\nДиагностика\n"
         "Жалобы: оталгия, лихорадка. Отоскопия.\nЛечение\n"
-        "Амоксициллин 500 мг 3 раза в сутки 7 дней."
+        "Амоксициллин 500 мг 3 раза в сутки 7 дней.\nДозировка детям: "
+        "амоксициллин 45 мг/кг в сутки.\nДоза амоксициллина ребенку "
+        "рассчитывается по весу."
     )
     repo.save_document(
         {
             "document_id": str(uuid.uuid4()),
-            "title": "TEST: Острый средний отит",
-            "nosology": "Острый средний отит",
+            "title": "TEST: Острый средний отит",            "nosology": "Острый средний отит",
             "icd10_codes": ["H66.9"],
             "approval_year": 2024,
             "revision_year": None,
@@ -49,4 +50,18 @@ def _seed_minimal_docs():
             "needs_manual_review": False,
             "_full_text": text,
         }
+    )
+    # Индексация сида в VectorStore: иначе retrieval-тесты зависят от
+    # порядка (пустой индекс → top_score 0 → ложный отказ). Аудит-4.
+    from app.ingestion.pipeline import chunk_text
+    from app.rag.generator import vs as _vs
+
+    _vs().add(
+        chunk_text(text, {"section": "general", "page_range": [1]}),
+        {
+            "title": "TEST: Острый средний отит",
+            "nosology": "Острый средний отит",
+            "document": "TEST: Острый средний отит",
+            "icd10_codes": ["H66.9"],
+        },
     )

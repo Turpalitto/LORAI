@@ -4,11 +4,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 from app.ingestion.pipeline import process_pdf
 from app.knowledge_base import repository as repo
 from app.knowledge_base.vector_store import VectorStore
+from app.core.config import settings
 from app.llm_clients.mock import MockLLMClient
 def ingest(path: str, title=None):
     doc = process_pdf(path, MockLLMClient(), title=title)
     repo.save_document(doc)
-    VectorStore().add(doc["_chunks"], {"title": doc["title"], "nosology": doc["nosology"],
+    VectorStore(settings.CHROMA_DIR).add(doc["_chunks"], {"title": doc["title"], "nosology": doc["nosology"],
         "document": doc["title"], "icd10_codes": ",".join(doc["icd10_codes"])})
     print(f"OK {doc['title'][:60]} | ICD={doc['icd10_codes'][:6]} | conf={doc['extraction_confidence']} | chunks={len(doc['_chunks'])}")
     return doc

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     LLM_THRESHOLD: float = 0.12
     DATABASE_URL: str = f"sqlite:///{ROOT_DIR}/lorai.db"
     CHROMA_DIR: str = str(ROOT_DIR / "data" / "vector_store")
+    VECTOR_BACKEND: str = "tfidf"  # tfidf | chroma (см. DECISIONS #20)
     EMBEDDING_MODEL: str = "intfloat/multilingual-e5-base"
     JWT_SECRET: str = "change-me-in-production-please"
     JWT_ALGORITHM: str = "HS256"
