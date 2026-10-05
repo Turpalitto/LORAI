@@ -101,8 +101,9 @@ def process_pdf(path: str, llm_client=None, title: str | None = None) -> dict:
         if isinstance(t, dict): t = t.get("raw", "")
         chunks += chunk_text(str(t), {"section": sec_name,
             "page_range": doc["source_pages"].get(sec_name, [1])})
-    # плюс общий чанк начала документа
-    chunks += chunk_text(full[:6000], {"section": "general", "page_range": [1, 2, 3]})
+    # плюс общие чанки ПО ВСЕМУ документу (дозы/факты в конце не должны теряться)
+    chunks += chunk_text(full, {"section": "general", "page_range": sorted(
+        {p["page"] for p in pages})[:10] or [1]})
     doc["_chunks"] = chunks
-    doc["_full_text"] = full[:20000]
+    doc["_full_text"] = full[:60000]
     return doc

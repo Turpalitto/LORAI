@@ -8,8 +8,9 @@ export function Dashboard() {
 export function Chat() {
   const [q, setQ] = React.useState('Острый средний отит: диагностика и лечение?');
   const [a, setA] = React.useState('');
-  const ask = async () => { const r = await api('/chat', { method: 'POST', body: JSON.stringify({ query: q }) }); setA(r.answer || r.warning); };
-  return <div><h2>Чат-ассистент (RAG)</h2><textarea value={q} onChange={e => setQ(e.target.value)} rows={3} style={{ width: '100%' }} /><br /><button onClick={ask}>Спросить</button><pre style={{ whiteSpace: 'pre-wrap', background: '#f3f4f6', padding: 12 }}>{a}</pre></div>;
+  const [sources, setSources] = React.useState<any[]>([]);
+  const ask = async () => { const r = await api('/chat', { method: 'POST', body: JSON.stringify({ query: q }) }); setA(r.answer || r.warning); setSources(r.sources || []); };
+  return <div><h2>Чат-ассистент (RAG)</h2><p style={{ background: '#fef3c7', padding: 8, borderRadius: 6 }}>⚠️ Не вводите персональные данные пациента (ФИО, паспорт, телефон, СНИЛС).</p><textarea value={q} onChange={e => setQ(e.target.value)} rows={3} style={{ width: '100%' }} /><br /><button onClick={ask}>Спросить</button><pre style={{ whiteSpace: 'pre-wrap', background: '#f3f4f6', padding: 12 }}>{a}</pre>{sources.length > 0 && <div><h4>Источники</h4>{sources.map((s: any, i: number) => <div key={i} style={{ border: '1px solid #ddd', margin: 4, padding: 6 }}>[Документ: {s.document || s.title || s.nosology}, Раздел: {s.section}, Стр.: {Array.isArray(s.page_range) ? s.page_range.join(', ') : s.page_range}] (score={s.score})</div>)}</div>}</div>;
 }
 export function ProtocolSearch() {
   const [q, setQ] = React.useState('H66'); const [items, setItems] = React.useState<any[]>([]);

@@ -125,6 +125,12 @@ def upload(request: Request, f: UploadFile, user: dict = Depends(admin_only)):
             "duplicate": bool(existing)}
 @app.get("/admin/documents")
 def docs(user: dict = Depends(admin_only)): return {"items": repo.list_documents()}
+class DocPatch(BaseModel): nosology: str | None = None; icd10_codes: list[str] | None = None; approval_year: int | None = None; needs_review: bool | None = None
+@app.patch("/admin/documents/{doc_id}")
+def patch_doc(doc_id: str, b: DocPatch, user: dict = Depends(admin_only)):
+    d = repo.update_document(doc_id, {k: v for k, v in b.model_dump().items() if v is not None})
+    if not d: raise HTTPException(404, "Не найдено")
+    return d
 @app.get("/history")
 def history(limit: int = 20, user: dict = Depends(auth)):
     return {"items": repo.get_history(limit)}
