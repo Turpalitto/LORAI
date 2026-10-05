@@ -30,3 +30,13 @@ class Favorite(Base):
     user: Mapped[str] = mapped_column(String, default="doctor")
     doc_id: Mapped[str] = mapped_column(String)
     note: Mapped[str] = mapped_column(String, default="")
+class Feedback(Base):
+    """Обратная связь 👍/👎 по ответам ассистента (Excellence-4: только сбор
+    данных для анализа качества, модель \"на лету\" не меняется)."""
+    __tablename__ = "feedback"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user: Mapped[str] = mapped_column(String, default="doctor")
+    query: Mapped[str] = mapped_column(Text)
+    vote: Mapped[int] = mapped_column(Integer)  # +1 / -1
+    comment: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

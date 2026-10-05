@@ -4,8 +4,17 @@ SYSTEM = """Ты — справочный ассистент ЛОР-врача. 
 В конце: "Инструмент справочный. Решение принимает врач."
 НЕ обрабатывай персональные данные пациента — предупреди об этом."""
 def build_prompt(query: str, chunks: list[dict]) -> tuple[str, str]:
+    docs = sorted({c.get("document") or c.get("title") or c.get("nosology", "") for c in chunks})
+    # Кросс-документный синтез (Excellence-1): явно требуем атрибуции —
+    # какая часть ответа из какого документа, если источников несколько.
+    multi = ""
+    if len(docs) > 1:
+        multi = ("\nКОНТЕКСТ ИЗ НЕСКОЛЬКИХ ДОКУМЕНТОВ:\n"
+                 + "\n".join(f"- {d}" for d in docs)
+                 + "\nСопоставь данные из разных документов в одном ответе, явно указывая, "
+                   "какая часть ответа из какого документа.")
     ctx = "\n\n".join(f"--- Источник {i+1} ---\nДокумент: {c.get('document') or c.get('title') or c.get('nosology','')}\n"
         f"Раздел: {c.get('section','')}\nСтраницы: {c.get('page_range','')}\nТекст: {c.get('text','')[:2000]}"
         for i, c in enumerate(chunks))
-    user = f"КОНТЕКСТ:\n{ctx}\n\nВОПРОС ВРАЧА: {query}\n\nОтвет со ссылками на источники."
+    user = f"КОНТЕКСТ:\n{ctx}\n{multi}\n\nВОПРОС ВРАЧА: {query}\n\nОтвет со ссылками на источники."
     return SYSTEM, user

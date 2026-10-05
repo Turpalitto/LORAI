@@ -1,6 +1,6 @@
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, func, desc
 from sqlalchemy.orm import Session
-from .models import Base, Document, QueryLog, Favorite
+from .models import Base, Document, QueryLog, Favorite, Feedback
 from ..core.config import settings
 eng = create_engine(settings.DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {})
 Base.metadata.create_all(eng)
@@ -67,3 +67,37 @@ def list_favorites(user: str) -> list[dict]:
     with Session(eng) as s:
         rows = s.execute(select(Favorite).where(Favorite.user == user)).scalars().all()
         return [{"id": r.id, "doc_id": r.doc_id, "note": r.note} for r in rows]
+
+def remove_favorite(user: str, fav_id: int) -> bool:
+    """Удалить только свою запись избранного; чужую — False."""
+    with Session(eng) as s:
+        r = s.get(Favorite, fav_id)
+        if not r or r.user != user:
+            return False
+        s.delete(r); s.commit()
+        return True
+
+def add_feedback(user: str, query: str, vote: int, comment: str = "") -> dict:
+    with Session(eng) as s:
+        f = Feedback(user=user, query=query[:2000], vote=vote, comment=comment[:1000])
+        s.add(f); s.commit()
+        return {"ok": True, "id": f.id}
+
+def usage_stats(gap_limit: int = 10) -> dict:
+    """Аналитика для админа клиники (Excellence-4): использование, пробелы
+    базы знаний (частые отказы), сводка оценок."""
+    with Session(eng) as s:
+        total = s.execute(select(func.count(QueryLog.id))).scalar() or 0
+        refused = s.execute(select(func.count(QueryLog.id)).where(QueryLog.refused.is_(True))).scalar() or 0
+        gaps = s.execute(
+            select(QueryLog.query, func.count(QueryLog.id).label("n"))
+            .where(QueryLog.refused.is_(True))
+            .group_by(QueryLog.query).order_by(desc("n")).limit(gap_limit)
+        ).all()
+        up = s.execute(select(func.count(Feedback.id)).where(Feedback.vote == 1)).scalar() or 0
+        down = s.execute(select(func.count(Feedback.id)).where(Feedback.vote == -1)).scalar() or 0
+        docs = s.execute(select(func.count(Document.id))).scalar() or 0
+        return {"documents": docs, "queries_total": total, "queries_refused": refused,
+                "refusal_rate": round(refused / total, 3) if total else 0.0,
+                "knowledge_gaps": [{"query": q, "count": n} for q, n in gaps],
+                "feedback": {"up": up, "down": down}}
