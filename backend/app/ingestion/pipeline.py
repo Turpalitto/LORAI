@@ -27,6 +27,9 @@ def detect_sections(pages: list[dict]) -> dict:
         if hit: cur = hit
         elif cur: buf[cur].append(ln)
     for k, v in buf.items(): secs[k] = "\n".join(v)[:6000]
+    # сколько осмысленных секций реально нашлось (сырой текст не в счёт)
+    found = [k for k in HEADINGS if secs.get(k, "").strip()]
+    secs["sections_found"] = found
     # source_pages: эвристика — ищем на каких страницах встретились ключи
     sp = {}
     for sec, pats in HEADINGS.items():
