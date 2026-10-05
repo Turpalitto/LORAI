@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+*.db
+*.log
+data/vector_store/
+data/raw_pdfs/
+node_modules/
+frontend/dist/
+.venv/
+*.pkl

@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lorai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lorai}
+      POSTGRES_DB: ${POSTGRES_DB:-lorai}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lorai}:${POSTGRES_PASSWORD:-lorai}@postgres:5432/${POSTGRES_DB:-lorai}
+      CHROMA_DIR: /app/data/vector_store
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      - postgres
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - backend
+volumes:
+  pgdata:
