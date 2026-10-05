@@ -7,6 +7,34 @@ def check_numbers(answer: str, chunks: list[dict]) -> str:
     if bad:
         return answer + "\n\n⚠️ Числа требуют проверки врачом: " + ", ".join(bad[:5])
     return answer
-def should_refuse(chunks: list[dict], threshold: float) -> bool:
-    if not chunks: return True
-    return max((c.get("score", 0) for c in chunks), default=0) < threshold
+
+# Маркеры предметной области (ЛОР). Вопрос без единого маркера считается
+# вне базы знаний независимо от TF-IDF-скора: общие слова («лечение»,
+# «диагностика») иначе дают ложное сходство с любым протоколом.
+LOR_MARKERS = [
+    "отит", "тонзиллит", "синусит", "гайморит", "ринит", "фарингит", "ларингит",
+    "аденоид", "мастоидит", "отоскоп", "тугоухост", "слух", "ухо", "ух",
+    "нос", "пазух", "миндалин", "глотк", "гортан", "голосов", "шепот",
+    "насморк", "заложенност", "храп", "перегородк", "полип", "ангин",
+    "лор", "оториноларинг", "слухов", "барабанн", "евстахи",
+    "лабиринтит", "неврит слухов", "тимпано", "тонзиллэктоми", "аденотоми",
+]
+ICD_LOR = re.compile(r"\b([HJ]\d{2}(?:\.\d{1,2})?|C3[012]|C73)\b", re.IGNORECASE)
+
+def has_lor_signal(query: str) -> bool:
+    q = (query or "").lower()
+    if ICD_LOR.search(q):
+        return True
+    return any(m in q for m in LOR_MARKERS)
+
+def should_refuse(chunks: list[dict], threshold: float, query: str | None = None) -> bool:
+    if not chunks:
+        return True
+    top = max((c.get("score", 0) for c in chunks), default=0)
+    if top < threshold:
+        return True
+    # Домен-гейт: нет ЛОР-сигнала в вопросе → честный отказ, даже если
+    # скор выше порога за счёт общеупотребительных слов.
+    if query is not None and not has_lor_signal(query):
+        return True
+    return False

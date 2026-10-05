@@ -29,6 +29,9 @@ def auth(authorization: str = Header(default="")) -> dict:
     if not authorization.startswith("Bearer "): raise HTTPException(401, "Нет токена")
     try: return decode_token(authorization[7:])
     except Exception: raise HTTPException(401, "Неверный токен")
+def admin_only(user: dict = Depends(auth)) -> dict:
+    if user.get("role") != "admin": raise HTTPException(403, "Только админ")
+    return user
 
 class Login(BaseModel): email: str; password: str
 class ChatIn(BaseModel): query: str; k: int = 6; nosology: str | None = None; icd10: str | None = None
@@ -57,6 +60,12 @@ def chat(b: ChatIn, request: Request):
     return r
 @app.get("/protocols")
 def protocols(q: str = ""): return {"items": repo.search_protocols(q), "disclaimer": DISCLAIMER}
+class SearchProtocolIn(BaseModel): q: str = ""; nosology: str | None = None; icd10: str | None = None; symptom: str | None = None
+@app.post("/search-protocol")
+def search_protocol(b: SearchProtocolIn):
+    """Точный поиск напрямую по БД. LLM НЕ вызывается — только детерминированная выдача."""
+    q = " ".join(x for x in (b.q, b.nosology, b.icd10, b.symptom) if x)
+    return {"items": repo.search_protocols(q), "llm_used": False, "disclaimer": DISCLAIMER}
 @app.get("/protocols/{doc_id}")
 def one_protocol(doc_id: str):
     d = repo.get_document(doc_id)
@@ -84,17 +93,26 @@ def referral(b: RefIn):
     d = repo.get_document(b.doc_id) or {}
     return {**ref.check_referral(b.answers, d), "disclaimer": DISCLAIMER}
 @app.post("/admin/upload")
+@app.post("/admin/upload-pdf")
 @limiter.limit("10/minute")
-def upload(request: Request, f: UploadFile, user: dict = Depends(auth)):
+def upload(request: Request, f: UploadFile, user: dict = Depends(admin_only)):
     if user.get("role") != "admin": raise HTTPException(403, "Только админ")
     if not f.filename.lower().endswith((".pdf", ".txt")): raise HTTPException(400, "Только PDF/TXT")
     blob = f.file.read()
     if len(blob) > 50 * 1024 * 1024: raise HTTPException(400, "Файл больше 50 МБ")
     if f.filename.lower().endswith(".pdf") and not blob[:4] == b"%PDF": raise HTTPException(400, "Не похоже на PDF")
+    # Дедупликация: повторная загрузка того же файла обновляет запись, а не плодит дубликаты
+    existing = next((d for d in repo.list_documents()
+                     if d.get("source_file") == f.filename or d.get("title") == f.filename), None)
     tmp = tempfile.mktemp(suffix="_" + f.filename)
     open(tmp, "wb").write(blob)
     from .llm_clients.mock import MockLLMClient
-    doc = process_pdf(tmp, MockLLMClient(), title=f.filename)
+    try:
+        doc = process_pdf(tmp, MockLLMClient(), title=f.filename)
+    except Exception as e:
+        raise HTTPException(400, f"Не удалось обработать файл: {e}")
+    if existing:
+        doc["document_id"] = existing["document_id"]
     repo.save_document(doc)
     vs().add(doc["_chunks"], {"title": doc["title"], "nosology": doc["nosology"],
         "document": doc["title"], "icd10_codes": ",".join(doc["icd10_codes"])})
@@ -103,11 +121,12 @@ def upload(request: Request, f: UploadFile, user: dict = Depends(auth)):
     try: (raw_dir / f.filename).write_bytes(open(tmp, "rb").read())
     except Exception: pass
     return {"document_id": doc["document_id"], "icd10": doc["icd10_codes"],
-            "confidence": doc["extraction_confidence"], "needs_review": doc["needs_manual_review"]}
-@app.get("/admin/documents", dependencies=[Depends(auth)])
-def docs(): return {"items": repo.list_documents()}
+            "confidence": doc["extraction_confidence"], "needs_review": doc["needs_manual_review"],
+            "duplicate": bool(existing)}
+@app.get("/admin/documents")
+def docs(user: dict = Depends(admin_only)): return {"items": repo.list_documents()}
 @app.get("/history")
-def history(limit: int = 20):
+def history(limit: int = 20, user: dict = Depends(auth)):
     return {"items": repo.get_history(limit)}
 class FavIn(BaseModel): doc_id: str; note: str = ""
 @app.post("/favorites")

@@ -14,7 +14,7 @@ def answer(query: str, k: int = 6, filters: dict | None = None) -> dict:
     intent = classify_intent(query)
     chunks = vs().search(query, k=k, filters=filters)
     top = max((c.get("score", 0) for c in chunks), default=0)
-    if should_refuse(chunks, settings.LLM_THRESHOLD):
+    if should_refuse(chunks, settings.LLM_THRESHOLD, query):
         repo.log_query(query, intent, True)
         return {"answer": REFUSAL, "refused": True, "intent": intent,
                 "top_score": top, "sources": chunks}

@@ -59,6 +59,15 @@ def process_pdf(path: str, llm_client=None, title: str | None = None) -> dict:
         try: llm_part = structure_with_llm(full[:8000], llm_client)
         except Exception: pass
     year_m = re.search(r"(19|20)\d{2}", os.path.basename(path))
+    found = secs.get("sections_found", [])
+    # Тихо терять данные запрещено: если секции не распознались (нестандартные
+    # заголовки) или нет кодов МКБ — документ уходит на ручную проверку.
+    needs_review = not bool(icd and full.strip()) or len(found) < 2
+    conf = "high" if (icd and len(full) > 3000 and len(found) >= 3) else (
+        "medium" if (full.strip() and not needs_review) else (
+            "medium" if (full.strip() and len(found) >= 1) else "low"))
+    if not full.strip():
+        conf, needs_review = "low", True
     doc = {
         "document_id": str(uuid.uuid4()),
         "title": title or os.path.basename(path)[:200],
@@ -82,8 +91,8 @@ def process_pdf(path: str, llm_client=None, title: str | None = None) -> dict:
             "referral_criteria": [], "follow_up": [],
         },
         "source_pages": secs.get("source_pages", {}),
-        "extraction_confidence": "high" if (icd and len(full) > 3000) else ("medium" if full.strip() else "low"),
-        "needs_manual_review": not bool(icd and full.strip()),
+        "extraction_confidence": conf,
+        "needs_manual_review": needs_review,
     }
     # чанки для RAG
     chunks = []
