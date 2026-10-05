@@ -13,6 +13,9 @@ _tmp = tempfile.mkdtemp(prefix="lorai_test_")
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
 os.environ["CHROMA_DIR"] = os.path.join(_tmp, "vector_store")
 os.environ["LORAI_TESTING"] = "1"
+# Тесты всегда на MockLLM: иначе боевой LLM_API_KEY из .env заставит
+# прогоны ходить в сеть (платно, медленно, flaky). Real LLM.
+os.environ["LLM_PROVIDER"] = "mock"
 
 import pytest
 

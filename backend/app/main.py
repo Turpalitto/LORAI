@@ -55,10 +55,12 @@ def health():
         vec_ok: bool | str = True
     except Exception as e:
         chunks = -1; vec_ok = f"vector error: {e}"
-    llm_configured = bool(os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY"))
+    from .core.config import settings as _s
+    llm_configured = _s.LLM_PROVIDER != "mock" and bool(_s.LLM_API_KEY)
     return {"ok": db_ok is True and vec_ok is True, "db": db_ok, "documents": docs,
             "vector_store": vec_ok, "chunks": chunks,
-            "llm_configured": llm_configured, "llm_mode": "api" if llm_configured else "mock",
+            "llm_configured": llm_configured,
+            "llm_mode": ("api:" + _s.LLM_PROVIDER) if llm_configured else "mock",
             "cache": cache.stats(), "avg_latency_ms": avg_latency(),
             "disclaimer": DISCLAIMER}
 @app.post("/auth/login")

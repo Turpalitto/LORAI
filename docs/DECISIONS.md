@@ -37,9 +37,10 @@
 - Факт: `docker` отсутствует в системе полностью (не только daemon off); brew/apt нет, установка Docker Desktop — вне сессии. docker-compose.yml в репо есть, `compose up` не проверялся.
 - Решение: пункт остаётся BLOCKED до установки Docker Desktop пользователем; локальный запуск — через scripts/run_local.sh (проверен).
 
-## #23 (2026-10-05, ROADMAP п.8): Real LLM — ждёт ключ
-- Факт: код поддерживает `LLM_PROVIDER=openai + LLM_API_KEY` (.env.example), по умолчанию MockLLM. Ключа в сессии нет.
-- Решение: переключение — только .env, без правок кода. До ключа MockLLM остаётся дефолтом (все проверки 48/48 + e2e 7/7 на нём).
+## #23 (2026-10-05, ROADMAP п.8): Real LLM — DONE via OpenRouter
+- Факт: пользователь выдал OpenRouter-ключ. Код уже поддерживал переключение (.env: LLM_PROVIDER=openrouter, BASE_URL=https://openrouter.ai/api/v1, MODEL=openai/gpt-4o-mini). Ключ — только в локальном .env (gitignored, в коммиты не попадает).
+- По пути найден и исправлен баг: /health проверял legacy OPENAI_API_KEY и всегда врал mock — теперь llm_mode берётся из settings (api:<provider>/mock). Тесты приколоты к mock через conftest (LLM_PROVIDER=mock), иначе прогоны ходили бы в сеть.
+- Проверка live: in-data запрос → реальный ответ с цитатами (latency 6.6с, без MOCK), инфаркт → refused True. pytest 48/48 за 3.6с (mock, сеть не трогают).
 
 ## #24 (2026-10-05, ROADMAP п.5/6): OCR PARTIAL, Playwright DONE
 - OCR: pdf_loader `_ocr_fallback` + pipeline `failed/needs_manual_review` + test_ocr.py (синтетический скан). Без tesseract сканы помечаются, а не теряются. Для текста нужен `brew install tesseract tesseract-lang`.
