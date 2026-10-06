@@ -138,7 +138,7 @@ a:hover { color: var(--brand-700); }
   border-radius: var(--radius-l); box-shadow: var(--shadow-s); padding: var(--space-3);
 }
 .card h2:first-child { margin-top: 0; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); align-items: start; }
 .panel {
   border: 1px solid var(--border); border-radius: var(--radius-m);
   padding: var(--space-2); background: var(--surface);
@@ -315,7 +315,7 @@ select { appearance: auto; }
 
 /* ---------- Chat ---------- */
 .ask-row { display: flex; gap: var(--space-1); flex-wrap: wrap; align-items: stretch; margin-top: var(--space-1); }
-.ask-row textarea { flex: 1 1 320px; }
+.ask-row textarea, .ask-row input { flex: 1 1 320px; }
 .answer {
   white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal;
   background: var(--surface-2); border: 1px solid var(--border);
@@ -432,6 +432,8 @@ details[open] summary { margin-bottom: 6px; }
 /* ---------- Utilities / small components ---------- */
 .art-bg { fill: var(--surface-2); }
 .art-paper { fill: var(--surface); }
+button.doc-row { background: var(--surface); color: var(--text); font: inherit; width: 100%; }
+button.doc-row:hover { background: var(--surface-2); }
 .doc-extra { flex-basis: 100%; }
 .form-line > .freq-input { flex: 0 0 84px; width: 84px; }
 .freq-input { width: 84px; flex: 0 0 84px; text-align: center; padding: 10px 6px; }

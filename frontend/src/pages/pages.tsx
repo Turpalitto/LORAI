@@ -18,11 +18,28 @@ function confAnyPill(c: unknown): string {
 const confLabel = (c: unknown): string =>
   typeof c === 'number' ? c.toFixed(2) : String(c ?? '—');
 
+const chatHash = (v: string) => { window.location.hash = '#/chat?q=' + encodeURIComponent(v); };
+
 export function Dashboard() {
   const [stats, setStats] = useState<any>(null);
   const [onb, setOnb] = useState(() => localStorage.getItem('lorai_onb') !== 'done');
-  React.useEffect(() => { api('/health').then(h => setStats({ docs: h.documents })).catch(() => api('/protocols?q=отит').then(d => setStats({ docs: d.items?.length })).catch(() => {})); }, []);
+  const [dq, setDq] = useState('');
+  const [recent, setRecent] = useState<any[] | null>(null);
+  const [popular, setPopular] = useState<any[]>([]);
+  const [health, setHealth] = useState<any>(null);
+  React.useEffect(() => {
+    api('/health').then(h => { setHealth(h); setStats({ docs: h.documents }); }).catch(() => {});
+    api('/history').then(d => setRecent((d.items || []).slice(0, 3))).catch(() => setRecent(null));
+    api('/protocols?q=').then(d => setPopular(
+      (d.items || []).slice().sort((a: any, b: any) => String(a.nosology).localeCompare(String(b.nosology), 'ru'))
+    )).catch(() => {});
+  }, []);
   const done = () => { localStorage.setItem('lorai_onb', 'done'); setOnb(false); };
+  const askQuick = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (dq.trim()) chatHash(dq.trim());
+  };
+  const llmMode = String(health?.llm_mode || '');
   return (
     <div className="stagger">
       {onb && (
@@ -39,6 +56,16 @@ export function Dashboard() {
           </div>
         </div>
       )}
+      <div className="card">
+        <h2 style={{ marginBottom: 8 }}>Быстрый вопрос</h2>
+        <p className="muted" style={{ marginTop: 0 }}>Напишите клинический вопрос — откроется чат с готовым запросом и цитатами протоколов.</p>
+        <form className="ask-row" onSubmit={askQuick}>
+          <input value={dq} onChange={e => setDq(e.target.value)}
+            placeholder="Например: Острый средний отит у ребёнка — лечение?"
+            aria-label="Быстрый клинический вопрос" />
+          <button className="btn" type="submit" disabled={!dq.trim()}>Спросить</button>
+        </form>
+      </div>
       <div className="stats-grid">
         <div className="stat">
           <span className="stat-v num">{stats?.docs ?? '…'}</span>
@@ -47,6 +74,43 @@ export function Dashboard() {
         <div className="stat">
           <span className="stat-v num">6</span>
           <span className="stat-l">рабочих инструментов: чат, протоколы, дифдиагностика, дозировки, калькуляторы, шаблоны</span>
+        </div>
+        <div className="stat" aria-label="Статус системы">
+          <span className="row" style={{ gap: 6 }}>
+            {!health && <span className="pill pill-mute">проверяю…</span>}
+            {health && (llmMode === 'mock' || !llmMode
+              ? <span className="pill pill-warn">ИИ: демо-режим</span>
+              : <span className="pill pill-ok">ИИ: подключён</span>)}
+            {health?.ok && <span className="pill pill-ok">сервер: online</span>}
+          </span>
+          <span className="stat-l">
+            {llmMode && llmMode !== 'mock' ? `модель ${llmMode}` : 'включите LLM-ключ в .env для реальных ответов'}
+          </span>
+        </div>
+      </div>
+      <div className="grid-2">
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Недавние запросы</h3>
+          {!recent && <p className="muted" style={{ margin: 0 }}>Войдите — история запросов подтянется.</p>}
+          {recent && recent.length === 0 && <p className="muted" style={{ margin: 0 }}>Пока пусто — задайте первый вопрос в чате.</p>}
+          {(recent || []).map((x, i) => (
+            <button key={i} className="doc-row" style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
+              onClick={() => chatHash(x.query)}>
+              <span style={{ flex: '1 1 auto' }}>{x.query}</span>
+              <span className="pill pill-mute">{x.intent}</span>
+              {x.refused && <span className="pill pill-danger">отказ</span>}
+            </button>
+          ))}
+        </div>
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Протоколы базы ({popular.length || '…'})</h3>
+          <p className="muted" style={{ marginTop: -4 }}>Клик — чек-лист приёма по нозологии.</p>
+          <div className="quick-links">
+            {popular.map((p: any) => (
+              <a key={p.document_id} href={'#/checklist/' + p.document_id}
+                title={(p.icd10_codes || []).join(', ')}>{p.nosology}</a>
+            ))}
+          </div>
         </div>
       </div>
       <div className="card">
@@ -66,6 +130,16 @@ export function Dashboard() {
 
 export function Chat() {
   const [q, setQ] = React.useState('Острый средний отит: диагностика и лечение?');
+  // «Быстрый вопрос» с дашборда: #/chat?q=... подставляет текст при маунте и при смене hash
+  React.useEffect(() => {
+    const read = () => {
+      const v = new URLSearchParams(window.location.hash.split('?')[1] || '').get('q');
+      if (v) setQ(v);
+    };
+    read();
+    window.addEventListener('hashchange', read);
+    return () => window.removeEventListener('hashchange', read);
+  }, []);
   const [a, setA] = React.useState('');
   const [meta, setMeta] = React.useState<any>(null);
   const [sources, setSources] = React.useState<any[]>([]);
@@ -188,6 +262,12 @@ export function Chat() {
             {meta?.doc_count > 1 && <span className="pill pill-mute">синтез из {meta.doc_count} документов</span>}
           </div>
           <div className="answer">{a}{streaming && <span className="stream-caret" aria-hidden="true" />}</div>
+          {a && !streaming && !meta?.refused && !meta?.needs_clarification && (meta?.top_score ?? 1) < 0.2 && (
+            <div className="panel panel-warn" style={{ marginTop: 8 }} role="note">
+              <b>Слабое совпадение с базой.</b> Ответ может не опираться на клинические рекомендации — уточните
+              запрос (нозология + задача) или откройте раздел «Протоколы».
+            </div>
+          )}
           <div className="vote-row">
             <span className="muted">Ответ полезен?</span>
             <button onClick={() => vote(1)} disabled={voted !== 0} aria-label="Ответ полезен">{voted === 1 ? '👍 спасибо!' : '👍'}</button>
@@ -617,6 +697,11 @@ export function Admin() {
           <div className="error-box" role="alert" style={{ marginTop: 12 }}>
             <b>Не удалось обработать файл.</b> {upError}
             <div className="muted">Проверьте формат (PDF/TXT до 50 МБ) и попробуйте снова.</div>
+            {/401|авториз/i.test(upError) && (
+              <div className="muted" style={{ marginTop: 6 }}>
+                Причина — нет входа: нажмите «Войти и показать документы» выше, затем повторите загрузку.
+              </div>
+            )}
           </div>
         )}
         {upResult && (

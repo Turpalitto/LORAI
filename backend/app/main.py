@@ -147,7 +147,11 @@ def chat_stream(query: str, request: Request, k: int = 6, session_id: str | None
     return StreamingResponse(_gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 @app.get("/protocols")
-def protocols(q: str = ""): return {"items": repo.search_protocols(q), "disclaimer": DISCLAIMER}
+def protocols(q: str = ""):
+    # пустой запрос = листинг метаданных (дашборд «протоколы базы»);
+    # с запросом — поиск как раньше
+    items = repo.list_documents() if not q.strip() else repo.search_protocols(q)
+    return {"items": items, "disclaimer": DISCLAIMER}
 class SearchProtocolIn(BaseModel): q: str = ""; nosology: str | None = None; icd10: str | None = None; symptom: str | None = None
 @app.post("/search-protocol")
 def search_protocol(b: SearchProtocolIn):
