@@ -11,3 +11,4 @@
 - Аудит-5: закрыты — JWT fail-fast, дефолтный doctor-аккаунт (теперь только через env), CORS `*` (allowlist), PII-regex, temp-leak upload, инвалидация кэша при upload, sys.path-магия тестов (pytest.ini).
 - doctor-аккаунт: если нужен вход врача на стенде — задайте LORAI_DOCTOR_EMAIL / LORAI_DOCTOR_PASSWORD в .env и перезапустите backend (дефолтного больше нет).
 - LORAI_ENV=production + дефолтный JWT_SECRET = старт падает с RuntimeError (осознанный fail-fast, не баг).
+- Premium-аудит 2026-10-06 (docs/PREMIUM_AUDIT_REPORT.md): итог 8.4/10, вердикт «готово с оговорками». Открыто: нет SVG-иллюстраций пустых состояний; нет SSE-стриминга ответа чата; нет экспорта логов; upload в админке — через alert и захардкоженный localhost (доработать на VITE_API_URL + тосты); нет прогона на физическом устройстве/скринридере. Flutter-пункты брифа (adaptive icon, splash, APK, haptics) — N/A для web-стека.

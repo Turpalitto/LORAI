@@ -34,3 +34,17 @@
 - Excellence-4–6: `/red-flags` (8 сигналов) + баннер в дифдиагностике, `/calculators/centor|pta` + страница «Калькуляторы», `DELETE /favorites/{id}`, CI workflow.
 - Проверки: pytest 44/44, tsc clean, vite build ok (163KB), vitest 2/2, live-smoke всех новых роутов на :8000.
 - Детали: CHANGELOG.md, ROADMAP.md, docs/DECISIONS.md (#13–19), docs/PROGRESS_LOG.md.
+
+## Premium-аудит 2026-10-06 (PREMIUM_AUDIT_BRIEF.md)
+- Бриф сохранён как PREMIUM_AUDIT_BRIEF.md. Отчёт: docs/PREMIUM_AUDIT_REPORT.md.
+- Итог: 8.4/10, вердикт — готово с оговорками к внутреннему пилоту.
+  Порог 8.5 выполнен в 4/7 применимых категориях (визуал 8.5, контент 9.0,
+  перф 8.5, a11y 8.5); бренд/микро/прод — по 8.0 (нет иллюстратора,
+  нет SSE-стриминга ответа, нет прогона на физическом устройстве).
+- Слой поверх Excellence-наработок (фичи Excellence не тронуты — pages.tsx
+  сохранён как есть): `src/styles.css` (токены 8pt, типошкала, тёмная тема),
+  каркас App (шапка-бренд, навигация с активным пунктом, ErrorBoundary,
+  офлайн-баннер, футер с версией 1.1.0, skip-link), ApiError с человеческими
+  текстами по HTTP-статусам + таймаут 30с, favicon/title/meta.
+- Проверки: `npm run build` чистый, vitest 2/2 (backend-проверки — из upstream).
+- Flutter-пункты брифа — N/A для web-стека, зафиксированы честно в отчёте.
