@@ -12,3 +12,4 @@
 - doctor-аккаунт: если нужен вход врача на стенде — задайте LORAI_DOCTOR_EMAIL / LORAI_DOCTOR_PASSWORD в .env и перезапустите backend (дефолтного больше нет).
 - LORAI_ENV=production + дефолтный JWT_SECRET = старт падает с RuntimeError (осознанный fail-fast, не баг).
 - Premium-аудит 2026-10-06 (docs/PREMIUM_AUDIT_REPORT.md): итог 8.4/10, вердикт «готово с оговорками». Открыто: нет SVG-иллюстраций пустых состояний; нет SSE-стриминга ответа чата; нет экспорта логов; upload в админке — через alert и захардкоженный localhost (доработать на VITE_API_URL + тосты); нет прогона на физическом устройстве/скринридере. Flutter-пункты брифа (adaptive icon, splash, APK, haptics) — N/A для web-стека.
+- Backend 2026-10-06: 56/57, `test_vector_backend_switch` падает (assert vs.chroma is not None — chromadb не установлен в этом окружении; предсуществующее, к premium-проходу отношения не имеет).
