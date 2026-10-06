@@ -45,3 +45,10 @@
 ## #24 (2026-10-05, ROADMAP п.5/6): OCR PARTIAL, Playwright DONE
 - OCR: pdf_loader `_ocr_fallback` + pipeline `failed/needs_manual_review` + test_ocr.py (синтетический скан). Без tesseract сканы помечаются, а не теряются. Для текста нужен `brew install tesseract tesseract-lang`.
 - Playwright: e2e.smoke.spec.ts 7/7 PASS против live :8000; e2e.ci.spec.ts 4/4 на синтетике (seed_synthetic_data.py); CI-job e2e в ci.yml. Спеки бьют по API (быстро, 590мс), не по UI-кликам — полный UI-coverage при наличии времени.
+
+## #25 (2026-10-06, STACK RECONCILIATION): Flutter — нет, стек — web/PWA
+- Дата: 2026-10-06. Обнаружено расхождение между запланированным Flutter-стеком и фактической реализацией на React.
+- Факт: решений о Flutter в DECISIONS (#1–24) нет — Flutter существовал только в брифах (AGENT_BRIEF/EXCELLENCE/PREMIUM как mobile-цель), а код с самого начала писался на React+Vite + FastAPI. Расхождение «план vs код», а не «код vs код»: выкидывать нечего, переписывать нечего.
+- Принято решение: PWA-обёртка текущего веб-приложения для Android, как наиболее быстрый путь к устанавливаемому мобильному опыту без потери уже выполненной работы (manifest + Service Worker + install prompt; офлайн-доступ к ранее просмотренным протоколам = аналог требования мобильного ТЗ).
+- Все Flutter-специфичные пункты проверок (adaptive icon, splash-натив, go_router, haptics, APK-размер, WorkManager, TalkBack-натив) — N/A, стек — web/PWA. Если пилот покажет нужду в нативном ОС-уровне (биометрия ОС, фоновая синхронизация без браузера) — Flutter-AGENT_BRIEF.md поднимать отдельным проектом, не параллельно.
+- Premium-аудит 8.4/10 (⚠️) → план закрытия: SSE-стриминг чата, SVG-иллюстрации пустых состояний, прогон на устройстве; цель 9.0+ без оговорок.

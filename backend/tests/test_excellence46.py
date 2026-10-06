@@ -117,9 +117,30 @@ def test_diff_rank_token_match_phrase_not_verbatim():
 
 
 def test_vector_backend_switch(tmp_path, monkeypatch):
-    """VECTOR_BACKEND=chroma включает Chroma, default — TF-IDF."""
-    import os
+    """VECTOR_BACKEND=chroma включает Chroma, default — TF-IDF.
+    Реальная chromadb в тестовом окружении может отсутствовать — подменяем
+    модуль in-memory стабом (тестируем ветвление и контракт add/search,
+    а не саму библиотеку)."""
+    import sys, types
     from app.knowledge_base import vector_store as vsm
+
+    class _FakeCollection:
+        def __init__(self): self.docs: list[str] = []; self.metas: list[dict] = []
+        def add(self, ids, documents, metadatas):
+            self.docs.extend(documents); self.metas.extend(metadatas)
+        def delete(self, where=None): pass
+        def query(self, query_texts, n_results=1, where=None):
+            n = min(n_results, len(self.docs))
+            return {"documents": [self.docs[:n]], "metadatas": [self.metas[:n]],
+                    "distances": [[0.0] * n]}
+
+    class _FakeClient:
+        def __init__(self, path=None): self.coll = _FakeCollection()
+        def get_or_create_collection(self, name): return self.coll
+
+    fake = types.ModuleType("chromadb")
+    fake.PersistentClient = _FakeClient
+    monkeypatch.setitem(sys.modules, "chromadb", fake)
     monkeypatch.setenv("VECTOR_BACKEND", "chroma")
     vs = vsm.VectorStore(persist_dir=str(tmp_path / "c1"))
     assert vs.chroma is not None

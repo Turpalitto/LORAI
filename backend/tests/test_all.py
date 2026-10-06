@@ -28,3 +28,26 @@ def test_chat_grounded():
     c = TestClient(app)
     r = c.post("/chat", json={"query": "средний отит диагностика лечение"})
     assert "disclaimer" in r.json()
+def test_chat_stream_sse():
+    import json as _json
+    from fastapi.testclient import TestClient
+    from app.main import app
+    c = TestClient(app)
+    r = c.get("/chat/stream", params={"query": "средний отит диагностика лечение"})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/event-stream")
+    evts = [_json.loads(line[6:]) for line in r.text.splitlines() if line.startswith("data: ")]
+    kinds = [e.get("type") for e in evts]
+    assert kinds[0] == "meta" and kinds[-1] == "done"
+    assert any(k == "token" for k in kinds)
+    body = "".join(e.get("text", "") for e in evts if e.get("type") == "token")
+    assert len(body) > 0
+    assert evts[-1].get("latency_ms") is not None
+def test_chat_stream_pii_refused():
+    import json as _json
+    from fastapi.testclient import TestClient
+    from app.main import app
+    c = TestClient(app)
+    r = c.get("/chat/stream", params={"query": "Иванов 79001234567"})
+    evts = [_json.loads(line[6:]) for line in r.text.splitlines() if line.startswith("data: ")]
+    assert evts[-1]["type"] == "done" and evts[-1].get("answer") is None

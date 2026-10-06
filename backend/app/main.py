@@ -5,7 +5,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from .core.config import settings, DISCLAIMER, ROOT_DIR
 from .core.security import make_token, decode_token, hash_pw, verify_pw
 from .knowledge_base import repository as repo
@@ -121,6 +121,41 @@ def chat(b: ChatIn, request: Request):
     record_latency(ms)
     r["latency_ms"] = ms
     return r
+@app.get("/chat/stream")
+@limiter.limit("30/minute")
+def chat_stream(query: str, request: Request, k: int = 6, session_id: str | None = None):
+    """Потоковый вариант /chat (SSE): сначала событие meta (источники, отказ,
+    сессия), затем answer чанками по словам, в конце done с latency.
+    Ответ вычисляется той же RAG-функцией (честный отказ и цифры сохранены);
+    чанки — транспортная нарезка готового ответа для мгновенного first-token."""
+    import json as _json
+    if _has_pii(query):
+        def _pii():
+            yield 'data: {"type": "done", "warning": "Не вводите персональные данные пациента!", "answer": null}\n\n'
+        return StreamingResponse(_pii(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    t0 = time.monotonic()
+    r = rag_answer(query, k=k, filters=None, session_id=session_id)
+    r["disclaimer"] = DISCLAIMER
+    ms = round((time.monotonic() - t0) * 1000, 1)
+    record_latency(ms)
+    meta = {k2: r.get(k2) for k2 in ("refused", "intent", "top_score", "sources",
+            "source_map", "doc_count", "session_id", "needs_clarification",
+            "clarifying_question")}
+    meta["type"] = "meta"
+    text = r.get("answer") or ""
+    words = text.split(" ")
+    def _gen():
+        yield "data: " + _json.dumps(meta, ensure_ascii=False) + "\n\n"
+        buf: list[str] = []
+        for i, w in enumerate(words):
+            buf.append(w)
+            if len(buf) >= 8 or i == len(words) - 1:
+                yield "data: " + _json.dumps({"type": "token", "text": " ".join(buf) + (" " if i < len(words) - 1 else "")}, ensure_ascii=False) + "\n\n"
+                buf = []
+        yield "data: " + _json.dumps({"type": "done", "latency_ms": ms, "disclaimer": DISCLAIMER}, ensure_ascii=False) + "\n\n"
+    return StreamingResponse(_gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 @app.get("/protocols")
 def protocols(q: str = ""): return {"items": repo.search_protocols(q), "disclaimer": DISCLAIMER}
 class SearchProtocolIn(BaseModel): q: str = ""; nosology: str | None = None; icd10: str | None = None; symptom: str | None = None

@@ -1,0 +1,17 @@
+{
+  "name": "ЛОРАИ — помощник ЛОР-врача",
+  "short_name": "ЛОРАИ",
+  "description": "Справочник клинических рекомендаций для ЛОР-врача: чат-ассистент, дозировки, чек-листы приёма.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "ru",
+  "theme_color": "#0f766e",
+  "background_color": "#f8fafc",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

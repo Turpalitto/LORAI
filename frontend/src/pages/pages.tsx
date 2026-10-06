@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
-import { api } from '../api/client';
+import { API, api } from '../api/client';
+import { ArtChat, ArtEmpty, ArtOnboarding, ArtSearch } from '../components/illustrations';
 export function Dashboard() {
   const [stats, setStats] = useState<any>(null);
   const [onb, setOnb] = useState(() => localStorage.getItem('lorai_onb') !== 'done');
   React.useEffect(() => { api('/admin/documents').then(d => setStats({ docs: d.items?.length })).catch(() => api('/protocols?q=').then(d => setStats({ docs: d.items?.length }))); }, []);
   const done = () => { localStorage.setItem('lorai_onb', 'done'); setOnb(false); };
   return <div><h2>Дашборд</h2>
-    {onb && <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-      <b>Добро пожаловать в LORAI</b> — помощник по клиническим рекомендациям (ЛОР).<br />
+    {onb && <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: 12, borderRadius: 8, marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+      <ArtOnboarding />
+      <div><b>Добро пожаловать в LORAI</b> — помощник по клиническим рекомендациям (ЛОР).<br />
       1. <b>Чат</b> — задайте клинический вопрос, ответ придёт с цитатами протоколов.<br />
       2. <b>Поиск протокола</b> — точная выдача по нозологии/МКБ без LLM.<br />
       3. <b>Дифдиагностика</b> — ранжирование нозологий по симптомам.<br />
       <button onClick={done} style={{ marginTop: 8 }}>Понятно, скрыть</button>
-    </div>}
+      </div></div>}
     <p>Документов в базе: {stats?.docs ?? '…'}</p>
     <p style={{ color: '#6b7280', fontSize: 13 }}>Быстрые разделы: <a href="#/chat">чат</a> · <a href="#/search">поиск протокола</a> · <a href="#/diffdx">дифдиагностика</a> · <a href="#/dosage">дозировки</a></p>
   </div>;
@@ -31,9 +33,9 @@ export function Chat() {
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState('');
   const [voted, setVoted] = React.useState(0);
-  const ask = async () => {
-    if (!q.trim()) { setErr('Введите вопрос — пустой запрос отклоняется.'); return; }
-    setLoading(true); setErr(''); setVoted(0);
+  const [streaming, setStreaming] = React.useState(false);
+  const stopRef = React.useRef(false);
+  const askFull = async () => {
     try {
       const r = await api('/chat', { method: 'POST', body: JSON.stringify({ query: q, session_id: sid || undefined }) });
       setA(r.answer || r.warning || '');
@@ -41,6 +43,53 @@ export function Chat() {
       if (r.session_id) setSid(r.session_id);
       setMeta(r);
     } catch (e) { setErr('Ошибка запроса: ' + (e instanceof Error ? e.message : String(e))); }
+  };
+  const ask = async () => {
+    if (!q.trim()) { setErr('Введите вопрос — пустой запрос отклоняется.'); return; }
+    setLoading(true); setErr(''); setVoted(0); setA(''); setSources([]); setMeta(null);
+    // Потоковый режим: meta (источники) приходит первым, текст дописывается
+    // по мере чанков. При любой ошибке стрима — тихий фолбэк на POST /chat.
+    try {
+      const ctrl = new AbortController();
+      (stopRef as any).current = ctrl;
+      const res = await fetch(API + '/chat/stream?query=' + encodeURIComponent(q) + (sid ? '&session_id=' + encodeURIComponent(sid) : ''), { signal: ctrl.signal });
+      if (!res.ok || !res.body) throw new Error('stream unavailable');
+      setStreaming(true);
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '', acc = '';
+      const pump = async (): Promise<boolean> => {
+        const { done, value } = await reader.read();
+        if (done) return true;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop() || '';
+        for (const p of parts) {
+          const line = p.split('\n').find((l) => l.startsWith('data: '));
+          if (!line) continue;
+          try {
+            const e = JSON.parse(line.slice(6));
+            if (e.type === 'meta') {
+              setSources(e.sources || []);
+              if (e.session_id) setSid(e.session_id);
+              setMeta(e);
+            } else if (e.type === 'token') {
+              acc += e.text || '';
+              setA(acc);
+            }
+          } catch { /* пропуск битого чанка */ }
+        }
+        return false;
+      };
+      while (!(await pump())) {
+        if ((stopRef as any).stop) { try { await reader.cancel(); } catch { /* noop */ } break; }
+      }
+      setStreaming(false);
+      if (!acc) await askFull();
+    } catch {
+      setStreaming(false);
+      await askFull();
+    }
     setLoading(false);
   };
   const vote = async (v: number) => {
@@ -48,16 +97,16 @@ export function Chat() {
     catch { setErr('Оценку сохранить не удалось (нужен вход).'); }
   };
   const [confLabel, confBg] = confColor(meta?.top_score);
-  return <div><h2>Чат-ассистент (RAG)</h2><p style={{ background: '#fef3c7', padding: 8, borderRadius: 6 }}>⚠️ Не вводите персональные данные пациента (ФИО, паспорт, телефон, СНИЛС).</p><textarea value={q} onChange={e => setQ(e.target.value)} rows={3} style={{ width: '100%' }} /><br /><button onClick={ask} disabled={loading}>{loading ? 'Думаю…' : 'Спросить'}</button>{sid && <span style={{ marginLeft: 8, fontSize: 12, color: '#6b7280' }}>сессия {sid.slice(0, 8)}… (помнит контекст)</span>}
-    {loading && <div style={{ marginTop: 8 }}><div style={{ background: '#e5e7eb', borderRadius: 6, height: 14, marginBottom: 6 }} /><div style={{ background: '#e5e7eb', borderRadius: 6, height: 14, width: '70%', marginBottom: 6 }} /><div style={{ background: '#e5e7eb', borderRadius: 6, height: 14, width: '40%' }} /></div>}
+  return <div><h2>Чат-ассистент (RAG)</h2><p style={{ background: '#fef3c7', padding: 8, borderRadius: 6 }}>⚠️ Не вводите персональные данные пациента (ФИО, паспорт, телефон, СНИЛС).</p><textarea value={q} onChange={e => setQ(e.target.value)} rows={3} style={{ width: '100%' }} /><br /><button onClick={ask} disabled={loading}>{loading ? (streaming ? 'Получаю ответ…' : 'Думаю…') : 'Спросить'}</button>{streaming && <button onClick={() => { (stopRef as any).stop = true; }} style={{ marginLeft: 8 }}>Остановить</button>}{sid && <span style={{ marginLeft: 8, fontSize: 12, color: '#6b7280' }}>сессия {sid.slice(0, 8)}… (помнит контекст)</span>}
+    {loading && !a && <div style={{ marginTop: 8 }}><div style={{ background: '#e5e7eb', borderRadius: 6, height: 14, marginBottom: 6 }} /><div style={{ background: '#e5e7eb', borderRadius: 6, height: 14, width: '70%', marginBottom: 6 }} /><div style={{ background: '#e5e7eb', borderRadius: 6, height: 14, width: '40%' }} /></div>}
     {err && <p style={{ color: '#b91c1c' }}>{err}</p>}
-    {!loading && !a && !meta?.needs_clarification && !err && <p style={{ color: '#6b7280' }}>Здесь появится ответ с цитатами клинических рекомендаций.</p>}
+    {!loading && !a && !meta?.needs_clarification && !err && <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8 }}><ArtChat /><p style={{ color: '#6b7280' }}>Здесь появится ответ с цитатами клинических рекомендаций.</p></div>}
     {meta?.needs_clarification && <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: 10, borderRadius: 6, marginTop: 8 }}><b>Уточните, пожалуйста:</b> {meta.clarifying_question}</div>}
     {a && <div style={{ marginTop: 8 }}>
       <span style={{ background: confBg, color: '#fff', borderRadius: 10, padding: '2px 10px', fontSize: 12 }}>уверенность: {confLabel} (score={meta?.top_score?.toFixed?.(2) ?? meta?.top_score})</span>
       {meta?.cached && <span style={{ marginLeft: 6, fontSize: 12, color: '#6b7280' }}>из кэша · {meta?.latency_ms} мс</span>}
       {meta?.doc_count > 1 && <span style={{ marginLeft: 6, fontSize: 12, color: '#6b7280' }}>синтез из {meta.doc_count} документов</span>}
-      <pre style={{ whiteSpace: 'pre-wrap', background: '#f3f4f6', padding: 12 }}>{a}</pre>
+      <pre style={{ whiteSpace: 'pre-wrap', background: '#f3f4f6', padding: 12 }}>{a}{streaming && <span className="stream-caret" aria-hidden="true" />}</pre>
       <div>Ответ полезен? <button onClick={() => vote(1)} disabled={voted !== 0}>{voted === 1 ? '👍 спасибо!' : '👍'}</button> <button onClick={() => vote(-1)} disabled={voted !== 0}>{voted === -1 ? '👎 принято' : '👎'}</button></div>
     </div>}
     {sources.length > 0 && <details style={{ marginTop: 8 }}><summary>Источники ({sources.length})</summary>{sources.map((s: any, i: number) => <div key={i} style={{ border: '1px solid #ddd', margin: 4, padding: 6 }}>[Документ: {s.document || s.title || s.nosology}, Раздел: {s.section}, Стр.: {Array.isArray(s.page_range) ? s.page_range.join(', ') : s.page_range}] (score={s.score})</div>)}</details>}</div>;
@@ -82,7 +131,7 @@ export function ProtocolSearch() {
   React.useEffect(() => { go(); loadFavs(); }, []);
   return <div><h2>Поиск протокола</h2><input value={q} onChange={e => setQ(e.target.value)} /><button onClick={go} disabled={loading}>{loading ? '…' : 'Найти'}</button>
     {err && <p style={{ color: '#b91c1c' }}>{err}</p>}
-    {!loading && items.length === 0 && !err && <p style={{ color: '#6b7280' }}>Ничего не найдено. Попробуйте код МКБ (например, H66) или другое название. Точный поиск работает и без чата.</p>}
+    {!loading && items.length === 0 && !err && <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><ArtSearch /><p style={{ color: '#6b7280' }}>Ничего не найдено. Попробуйте код МКБ (например, H66) или другое название. Точный поиск работает и без чата.</p></div>}
     {items.map((p: any) => <div key={p.document_id} style={{ border: '1px solid #ddd', margin: 6, padding: 6 }}><b>{p.nosology}</b> [{(p.icd10_codes || []).join(', ')}] <a href={'#/checklist/' + p.document_id}>чек-лист</a> <button onClick={() => showRelated(p.document_id)} style={{ marginLeft: 6 }}>{rel[p.document_id] ? 'скрыть похожие' : 'похожие'}</button> <button onClick={() => addFav(p.document_id)} title="В избранное" style={{ marginLeft: 6 }}>⭐</button>
       {rel[p.document_id] && (rel[p.document_id].length === 0 ? <p style={{ color: '#6b7280' }}>Похожих протоколов не найдено.</p> : <ul>{rel[p.document_id].map((r: any) => <li key={r.document_id}>{r.nosology} [{(r.icd10_codes || []).join(', ')}] — {(r.reasons || []).join('; ')}</li>)}</ul>)}
     </div>)}
@@ -121,7 +170,7 @@ export function ChecklistPage() {
   const [c, setC] = React.useState<any>(null);
   const [err, setErr] = React.useState('');
   React.useEffect(() => { if (id) api('/checklist/' + id).then(setC).catch(() => setErr('Чек-лист недоступен: нет соединения с сервером.')); }, [id]);
-  if (!id) return <div><h2>Чек-лист приёма</h2><p style={{ color: '#6b7280' }}>Откройте чек-лист из поиска протокола — там кнопка «чек-лист» у каждой нозологии.</p></div>;
+  if (!id) return <div><h2>Чек-лист приёма</h2><div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><ArtEmpty /><p style={{ color: '#6b7280' }}>Откройте чек-лист из поиска протокола — там кнопка «чек-лист» у каждой нозологии.</p></div></div>;
   return <div><style>{'@media print { button { display: none; } body { font-size: 12pt; } }'}</style><h2>Чек-лист приёма: {c?.nosology ?? '…'}</h2>
   {err && <p style={{ color: '#b91c1c' }}>{err}</p>}
   {!c && !err && <p style={{ color: '#6b7280' }}>Загрузка чек-листа…</p>}
@@ -175,7 +224,7 @@ export function Referral() {
 export function History() {
   const [h, setH] = React.useState<any[]>([]);
   React.useEffect(() => { api('/history').then(d => setH(d.items || [])); }, []);
-  return <div><h2>История запросов</h2>{h.map((x: any, i: number) => <div key={i} style={{ borderBottom: '1px solid #eee', padding: 4 }}>{x.query} <i>[{x.intent}]{x.refused ? ' — отказ' : ''}</i></div>)}</div>;
+  return <div><h2>История запросов</h2>{h.length === 0 && <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><ArtEmpty /><p style={{ color: '#6b7280' }}>Пока пусто — задайте первый вопрос в разделе «Чат».</p></div>}{h.map((x: any, i: number) => <div key={i} style={{ borderBottom: '1px solid #eee', padding: 4 }}>{x.query} <i>[{x.intent}]{x.refused ? ' — отказ' : ''}</i></div>)}</div>;
 }
 export function Templates() {
   const [docs, setDocs] = React.useState<any[]>([]);

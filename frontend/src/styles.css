@@ -133,3 +133,32 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .checklist-print ul { margin: 4px 0 12px; }
 .checklist-print li { margin: 4px 0; }
 @media print { .lorai-header, .lorai-nav, .lorai-footer, .no-print { display: none !important; } .card { box-shadow: none; } }
+
+/* Базовая консистентность нативных элементов (страницы используют
+   инлайн-стили поверх этихтокенов — несогласованных «голых» элементов нет) */
+button:not(.btn) {
+  font: inherit; font-weight: 600; min-height: 44px; padding: 10px 16px;
+  border-radius: var(--radius-m); border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); cursor: pointer;
+}
+button:not(.btn):hover { filter: brightness(0.97); }
+button:not(.btn):disabled { opacity: .55; cursor: not-allowed; }
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select, textarea {
+  font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius-m);
+  padding: 10px 12px; min-height: 44px;
+}
+input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; accent-color: var(--brand-600); }
+pre:not(.answer-pre) {
+  white-space: pre-wrap; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--radius-m); padding: 12px;
+}
+details { border: 1px solid var(--border); border-radius: var(--radius-m); padding: 8px 12px; margin-top: 8px; background: var(--surface); }
+summary { cursor: pointer; font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; }
+.stream-caret { display: inline-block; width: 9px; height: 1.1em; background: var(--brand-600); vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (max-width: 560px) {
+  .lorai-header { flex-wrap: wrap; }
+  input:not([type="checkbox"]):not([type="radio"]) { font-size: 16px; } /* без авто-зума iOS */
+}

@@ -48,3 +48,15 @@
   текстами по HTTP-статусам + таймаут 30с, favicon/title/meta.
 - Проверки: `npm run build` чистый, vitest 2/2 (backend-проверки — из upstream).
 - Flutter-пункты брифа — N/A для web-стека, зафиксированы честно в отчёте.
+
+## Stack Reconciliation + PWA 2026-10-06 (итог 9.0/10, ✅ пилот)
+- DECISIONS #25: расхождение «Flutter-план vs React-код» закрыто официально —
+  стек web/PWA (PWA-обёртка: manifest + SW + install prompt), Flutter-пункты — N/A.
+- Новое: `GET /chat/stream` (SSE: meta → tokens → done, PII/отказ сохранены),
+  стрим-рендер чата с кареткой и кнопкой «Остановить», PWA-ассеты
+  (иконки 192/512/180, sw.js с офлайном протоколов, offline.html),
+  4 line-art SVG в 5 пустых состояниях, базовые стили нативных элементов.
+- Проверки: backend pytest 59/59 (SSE-тесты + chroma-стаб), vitest 4/4,
+  build чистый (JS 173 КБ/gzip 57 КБ), Lighthouse desktop: perf 1.0, a11y 0.94.
+- Отчёт: docs/PREMIUM_AUDIT_REPORT.md (v2). Условие перед первым врачом:
+  ручная установка PWA + офлайн-протокол на реальном Android (см. KNOWN_ISSUES).

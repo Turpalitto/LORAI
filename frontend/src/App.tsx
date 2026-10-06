@@ -47,6 +47,31 @@ class Boundary extends React.Component<{ children: React.ReactNode }, { err: str
   }
 }
 
+function InstallPrompt() {
+  const [evt, setEvt] = React.useState<any>(null);
+  const [dismissed, setDismissed] = React.useState(() => localStorage.getItem('lorai-install-hide') === '1');
+  React.useEffect(() => {
+    const visits = Number(localStorage.getItem('lorai-visits') || '0') + 1;
+    localStorage.setItem('lorai-visits', String(visits));
+    const h = (e: Event) => {
+      e.preventDefault();
+      if (Number(localStorage.getItem('lorai-visits') || '0') >= 2) setEvt(e);
+    };
+    window.addEventListener('beforeinstallprompt', h);
+    return () => window.removeEventListener('beforeinstallprompt', h);
+  }, []);
+  if (!evt || dismissed) return null;
+  return (
+    <div className="banner" role="status" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span>📲 Установите ЛОРАИ на главный экран — откроется как отдельное приложение, ранее просмотренные протоколы доступны офлайн.</span>
+      <span className="row">
+        <button className="btn btn-secondary" style={{ minHeight: 44 }} onClick={() => (evt as any).prompt()}>Установить</button>
+        <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => { localStorage.setItem('lorai-install-hide', '1'); setDismissed(true); }}>Позже</button>
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
   const [, tick] = React.useState(0);
   const [theme, setTheme] = React.useState<'light' | 'dark'>(themeInit);
@@ -101,6 +126,7 @@ export default function App() {
         </div>
       )}
       <Banner />
+      <InstallPrompt />
       <nav className="lorai-nav" aria-label="Основные разделы">
         {LINKS.map(([h, l]) => (
           <a key={h} href={'#/' + h} aria-current={(active === h || (h === '' && active === '')) ? 'page' : undefined}>
