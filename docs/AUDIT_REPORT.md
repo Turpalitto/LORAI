@@ -71,3 +71,36 @@ In-data отвечает с источниками; инфаркт → чест�
 ## Блок 8 — BLOCKED (Playwright-браузеры не ставились)
 ## Дополнительно: rate-limit 30×200+429 ok; дисклеймер во всех ответах; ПДн-баннер в чате; README точен.
 ## Итог: pytest 45/45, tsc clean, vitest 2/2, прод 22 docs цел.
+
+
+# АУДИТ-5 (2026-10-05, полный аудит кода + прогон тестов, Codebuff)
+Метод: построчный просмотр всех 32 backend-модулей, frontend, mobile, docker-compose, CI;
+pytest 57/57 (было 48), vitest 2/2, tsc clean, vite build ok, live-smoke :8000.
+
+## Найдено и ИСПРАВЛЕНО (7)
+1. [SEC, критично] JWT_SECRET дефолтный в .env + отсутствовал fail-fast → `security.py`:
+   в production (LORAI_ENV=production) запуск с дефолтом падает с RuntimeError; в dev — warning.
+2. [SEC] Дефолтный врач-аккаунт doctor@lorai.local/doctor123 захардкожен всегда →
+   создаётся только через LORAI_DOCTOR_EMAIL/LORAI_DOCTOR_PASSWORD в Settings (работает и .env, и os.environ; RBAC-тесты обновлены на env-фикстуру).
+3. [SEC] CORS `allow_origins=["*"]` на все методы → allowlist LORAI_ALLOWED_ORIGINS
+   (по умолчанию localhost:5173; native-клиенты без Origin не затрагиваются; JWT остаётся авторизацией).
+4. [BUG] PII-фильтр чата — 5 подстрок, пропускал полис ОМС (16 цифр), дату рождения, паспорт-серию,
+   телефоны без «+7» → 6 regex-паттернов (СНИЛС/полис/др.рождения/РФ-телефон/паспорт/личные слова)
+   + негативный тест, что клинический запрос с «500 мг» не блокируется.
+5. [BUG] upload писал blob через tempfile.mktemp и не удалял файл (leak в системном tmp + race) →
+   mkstemp + try/finally unlink; тест гарантирует отсутствие lorai_upload_* остатков.
+6. [BUG] Кэш /chat и /search-protocol не инвалидовался при upload → врач получал «не найдено»
+   по свежезагруженному протоколу до конца TTL → cache.clear() после сохранения + e2e-тест инвалидации.
+7. [INFRA] Импорт app в тестах держался на sys.path.insert в 3 файлах (хрупко: соло-запуск нового
+   тест-файла падал) → pytest.ini в корне (pythonpath=backend), работает из корня и из backend/.
+
+## Улучшено
+- [PERF] search_protocols: Python full-scan 22×60k символов (24–31 мс, растёт с корпусом) →
+  SQL-пушдаун LIKE по title/nosology/full_text (6–13 мс, сложность в БД).
+- [UX] Страницы «Направление» и «Шаблоны» требовали UUID руками → выпадающий список протоколов.
+- .env.example дополнен LORAI_DOCTOR_EMAIL/PASSWORD, LORAI_ENV, LORAI_ALLOWED_ORIGINS.
+
+## Проверено и подтверждено (без изменений)
+- Честный отказ: «борщ»→refused, инфаркт→refused; отит→6 источников; домен-гейт работает.
+- RBAC: 401 без токена, 403 врач→admin; /search-protocol llm_used=false; дозы 800/480/3000.
+- Данные: 22 документа / 1599 чанков целы; прод не тронут (тесты на изолированной БД).

@@ -14,7 +14,7 @@ from .ingestion.pipeline import process_pdf
 from .features import dosage_calculator as dose, differential_diagnosis as dd
 from .features import checklist_generator as chk, report_templates as tpl, referral_criteria as ref
 from .core.cache import cache, record_latency, avg_latency
-import os, tempfile, time
+import os, re, tempfile, time
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="LORAI — помощник ЛОР-врача")
@@ -22,10 +22,22 @@ app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 @app.exception_handler(RateLimitExceeded)
 def _ratelimit(request, exc): return JSONResponse({"detail": "Слишком много запросов, подождите."}, status_code=429)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-USERS = {settings.ADMIN_EMAIL: {"pw": hash_pw(settings.ADMIN_PASSWORD), "role": "admin"},
-         "doctor@lorai.local": {"pw": hash_pw("doctor123"), "role": "doctor"}}
+# CORS: явный allowlist вместо "*". Origin нативных мобильных клиентов
+# отсутствует — такие запросы пропускаются браузерной политикой не проверяются,
+# поэтому список нужен только для web-клиентов (CORS не авторизация: JWT
+# по-прежнему обязателен на каждом защищённом эндпоинте).
+ALLOWED_ORIGINS = [o.strip() for o in settings.LORAI_ALLOWED_ORIGINS.split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS,
+                   allow_methods=["*"], allow_headers=["*"])
+
+USERS = {settings.ADMIN_EMAIL: {"pw": hash_pw(settings.ADMIN_PASSWORD), "role": "admin"}}
+# Врачебный аккаунт создаётся только если он явно задан в env/.env: раньше
+# doctor@lorai.local/doctor123 существовал всегда — обходной путь мимо админа
+# с известным дефолтом. Через settings, чтобы работал и .env-файл.
+if settings.LORAI_DOCTOR_EMAIL and settings.LORAI_DOCTOR_PASSWORD:
+    USERS[settings.LORAI_DOCTOR_EMAIL] = {
+        "pw": hash_pw(settings.LORAI_DOCTOR_PASSWORD), "role": "doctor"}
 def auth(authorization: str = Header(default="")) -> dict:
     if not authorization.startswith("Bearer "): raise HTTPException(401, "Нет токена")
     try: return decode_token(authorization[7:])
@@ -39,6 +51,22 @@ class ChatIn(BaseModel): query: str; k: int = 6; nosology: str | None = None; ic
 class DoseIn(BaseModel): weight_kg: float; mg_per_kg: float; max_mg: float | None = None; frequency: str = ""
 class DiffIn(BaseModel): symptoms: list[str]
 class RefIn(BaseModel): doc_id: str; answers: dict
+
+# ПДн-фильтр входящих запросов: раньше был список из 5 подстрок, который
+# пропускал полис ОМС, дату рождения, паспорт-серию без слова «паспорт».
+# Форматы: СНИЛС, полис ОМС (16 цифр), дата рождения, телефон РФ, паспорт РФ,
+# длинные цифровые ID. Слово «снилс/полис» тоже триггерит независимо от формата.
+_PII_RX = [
+    re.compile(r"\b\d{3}-\d{3}-\d{3}\s*\d{2}\b"),          # СНИЛС 123-456-789 00
+    re.compile(r"\b\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\b"),      # полис ОМС 16 цифр
+    re.compile(r"\b\d{2}\.\d{2}\.(19|20)\d{2}\b"),           # дата рождения 01.02.1990
+    re.compile(r"(?:\+7|8)[\s\-\(]?\d{3}.*\d{2}.*\d{2}"),   # телефон РФ
+    re.compile(r"\b\d{2}\s?\d{2}\s?№?\s?\d{6}\b"),          # паспорт РФ 99 99 №123456
+    re.compile(r"\bснилс\b|\bполис\b|\bпаспорт\b|\bфамили[яию]|\bиванов[ауы]?\b", re.I),
+]
+
+def _has_pii(text: str) -> bool:
+    return any(rx.search(text or "") for rx in _PII_RX)
 
 @app.get("/health")
 def health():
@@ -71,7 +99,7 @@ def login(b: Login):
 @app.post("/chat")
 @limiter.limit("30/minute")
 def chat(b: ChatIn, request: Request):
-    if any(p in b.query.lower() for p in ("иванова", "паспорт", "снils", "снилс", "+7")):
+    if _has_pii(b.query):
         return {"warning": "Не вводите персональные данные пациента!", "answer": None}
     f = {}
     if b.nosology: f["nosology"] = b.nosology
@@ -147,13 +175,20 @@ def upload(request: Request, f: UploadFile, user: dict = Depends(admin_only)):
     # Дедупликация: повторная загрузка того же файла обновляет запись, а не плодит дубликаты
     existing = next((d for d in repo.list_documents()
                      if d.get("source_file") == f.filename or d.get("title") == f.filename), None)
-    tmp = tempfile.mktemp(suffix="_" + f.filename)
-    open(tmp, "wb").write(blob)
-    from .llm_clients.mock import MockLLMClient
+    # Именованный temp с гарантированным удалением: раньше tempfile.mktemp
+    # оставлял файл навсегда (leak в системном tmp) и имел race-condition.
+    fd, tmp = tempfile.mkstemp(prefix="lorai_upload_", suffix="_" + (f.filename or "pdf")[:100])
     try:
-        doc = process_pdf(tmp, MockLLMClient(), title=f.filename)
-    except Exception as e:
-        raise HTTPException(400, f"Не удалось обработать файл: {e}")
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(blob)
+        from .llm_clients.mock import MockLLMClient
+        try:
+            doc = process_pdf(tmp, MockLLMClient(), title=f.filename)
+        except Exception as e:
+            raise HTTPException(400, f"Не удалось обработать файл: {e}")
+    finally:
+        try: os.unlink(tmp)
+        except OSError: pass
     if existing:
         doc["document_id"] = existing["document_id"]
         # старые чанки из векторного индекса удаляем, иначе дедуп в SQLite
@@ -165,8 +200,12 @@ def upload(request: Request, f: UploadFile, user: dict = Depends(admin_only)):
     raw_dir = ROOT_DIR / "data" / "raw_pdfs"
     raw_dir.mkdir(parents=True, exist_ok=True)
     if os.getenv("LORAI_TESTING") != "1":
-        try: (raw_dir / f.filename).write_bytes(open(tmp, "rb").read())
+        try: (raw_dir / f.filename).write_bytes(blob)
         except Exception: pass
+    # Инвалидация кэша: ответы /chat и /search-protocol закэшированы по тексту
+    # запроса — после загрузки нового документа они обязаны учесть его, иначе
+    # врач получает «не найдено» для свежезагруженного протокола до конца TTL.
+    cache.clear()
     return {"document_id": doc["document_id"], "icd10": doc["icd10_codes"],
             "confidence": doc["extraction_confidence"], "needs_review": doc["needs_manual_review"],
             "duplicate": bool(existing)}

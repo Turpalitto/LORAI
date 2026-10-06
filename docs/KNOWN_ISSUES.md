@@ -7,3 +7,7 @@
 - Frontend — 10 страниц (Dashboard/Chat/Search/Dosage/Checklist/DiffDx/Referral/History/Templates/Calculators/Admin), shadcn-стили не внедрены.
 - Alembic-миграция 0002_feedback создана в аудите-4 (таблица feedback).
 - Flutter SDK не установлен на машине — mobile-фаза (AGENT_BRIEF) заблокирована до установки Flutter 3.x + Android SDK.
+
+- Аудит-5: закрыты — JWT fail-fast, дефолтный doctor-аккаунт (теперь только через env), CORS `*` (allowlist), PII-regex, temp-leak upload, инвалидация кэша при upload, sys.path-магия тестов (pytest.ini).
+- doctor-аккаунт: если нужен вход врача на стенде — задайте LORAI_DOCTOR_EMAIL / LORAI_DOCTOR_PASSWORD в .env и перезапустите backend (дефолтного больше нет).
+- LORAI_ENV=production + дефолтный JWT_SECRET = старт падает с RuntimeError (осознанный fail-fast, не баг).

@@ -16,6 +16,10 @@ os.environ["LORAI_TESTING"] = "1"
 # Тесты всегда на MockLLM: иначе боевой LLM_API_KEY из .env заставит
 # прогоны ходить в сеть (платно, медленно, flaky). Real LLM.
 os.environ["LLM_PROVIDER"] = "mock"
+# Врачебный аккаунт больше не захардкожен в app.main — тесты RBAC создают
+# его явно через env (в проде дефолтного doctor@lorai.local/doctor123 нет).
+os.environ["LORAI_DOCTOR_EMAIL"] = "doctor@lorai.local"
+os.environ["LORAI_DOCTOR_PASSWORD"] = "doctor123"
 
 import pytest
 

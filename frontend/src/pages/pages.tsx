@@ -150,9 +150,27 @@ export function DiffDx() {
     {r.map((x: any, i: number) => <div key={i} style={{ border: i === 0 ? '2px solid #16a34a' : '1px solid #ddd', margin: 6, padding: 6 }}><b>{i + 1}. {x.nosology}</b> [{(x.icd10 || []).join(',')}] score={x.score} — совпало: {x.matched.join('; ')}{x.key_signs && x.key_signs.length > 0 && <span><br /><i>Ключевые признаки: {x.key_signs.join('; ')}</i></span>}</div>)}</div>;
 }
 export function Referral() {
+  const [docs, setDocs] = React.useState<any[]>([]);
   const [id, setId] = React.useState(''); const [crit, setCrit] = React.useState('мастоидит, парез лицевого нерва'); const [r, setR] = React.useState<any>(null);
-  const go = async () => { const ans: any = {}; crit.split(',').map(x => x.trim()).filter(Boolean).forEach(k => ans[k] = true); setR(await api('/referral-check', { method: 'POST', body: JSON.stringify({ doc_id: id, answers: ans }) })); };
-  return <div><h2>Критерии направления / госпитализации</h2>ID протокола: <input value={id} onChange={e => setId(e.target.value)} style={{ width: '50%' }} /><br />Критерии (запятая): <input value={crit} onChange={e => setCrit(e.target.value)} style={{ width: '60%' }} /> <button onClick={go}>Проверить</button>{r && <p><b>{r.verdict}</b></p>}</div>;
+  const [err, setErr] = React.useState('');
+  React.useEffect(() => { api('/protocols?q=').then(d => setDocs(d.items || [])).catch(() => {}); }, []);
+  const go = async () => {
+    if (!id) { setErr('Выберите протокол из списка.'); return; }
+    setErr('');
+    try {
+      const ans: any = {}; crit.split(',').map(x => x.trim()).filter(Boolean).forEach(k => ans[k] = true);
+      setR(await api('/referral-check', { method: 'POST', body: JSON.stringify({ doc_id: id, answers: ans }) }));
+    } catch (e) { setErr('Ошибка: ' + (e instanceof Error ? e.message : String(e))); }
+  };
+  return <div><h2>Критерии направления / госпитализации</h2>
+    Протокол: <select value={id} onChange={e => setId(e.target.value)} style={{ maxWidth: '100%' }}>
+      <option value="">— выберите протокол —</option>
+      {docs.map((d: any) => <option key={d.document_id} value={d.document_id}>{d.nosology} [{(d.icd10_codes || []).join(', ')}]</option>)}
+    </select><br />
+    Критерии (через запятую): <input value={crit} onChange={e => setCrit(e.target.value)} style={{ width: '60%' }} /> <button onClick={go}>Проверить</button>
+    {err && <p style={{ color: '#b91c1c' }}>{err}</p>}
+    {!docs.length && <p style={{ color: '#6b7280' }}>Список протоколов недоступен (нужен запуск backend).</p>}
+    {r && <p><b>{r.verdict}</b></p>}</div>;
 }
 export function History() {
   const [h, setH] = React.useState<any[]>([]);
@@ -160,9 +178,23 @@ export function History() {
   return <div><h2>История запросов</h2>{h.map((x: any, i: number) => <div key={i} style={{ borderBottom: '1px solid #eee', padding: 4 }}>{x.query} <i>[{x.intent}]{x.refused ? ' — отказ' : ''}</i></div>)}</div>;
 }
 export function Templates() {
+  const [docs, setDocs] = React.useState<any[]>([]);
   const [id, setId] = React.useState(''); const [t, setT] = React.useState('');
-  const go = async (k: string) => setT((await api(`/templates/${k}/${id}`)).text);
-  return <div><h2>Шаблоны заключений</h2>ID протокола: <input value={id} onChange={e => setId(e.target.value)} /> <button onClick={() => go('zaklyuchenie')}>Заключение</button> <button onClick={() => go('napravlenie')}>Направление</button><pre style={{ whiteSpace: 'pre-wrap' }}>{t}</pre></div>;
+  const [err, setErr] = React.useState('');
+  React.useEffect(() => { api('/protocols?q=').then(d => setDocs(d.items || [])).catch(() => {}); }, []);
+  const go = async (k: string) => {
+    if (!id) { setErr('Сначала выберите протокол из списка.'); return; }
+    setErr('');
+    try { setT((await api(`/templates/${k}/${id}`)).text); } catch (e) { setErr('Ошибка: ' + (e instanceof Error ? e.message : String(e))); }
+  };
+  return <div><h2>Шаблоны заключений</h2>
+    Протокол: <select value={id} onChange={e => setId(e.target.value)} style={{ maxWidth: '100%' }}>
+      <option value="">— выберите протокол —</option>
+      {docs.map((d: any) => <option key={d.document_id} value={d.document_id}>{d.nosology} [{(d.icd10_codes || []).join(', ')}]</option>)}
+    </select>{' '}
+    <button onClick={() => go('zaklyuchenie')}>Заключение</button> <button onClick={() => go('napravlenie')}>Направление</button>
+    {err && <p style={{ color: '#b91c1c' }}>{err}</p>}
+    <pre style={{ whiteSpace: 'pre-wrap' }}>{t}</pre></div>;
 }
 export function Admin() {
   const [email, setEmail] = React.useState('admin@lorai.local'); const [pw, setPw] = React.useState('admin123'); const [docs, setDocs] = React.useState<any[]>([]);

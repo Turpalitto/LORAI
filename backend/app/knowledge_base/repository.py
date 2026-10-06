@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, select, func, desc
+from sqlalchemy import create_engine, select, func, desc, and_, or_
 from sqlalchemy.orm import Session
 from .models import Base, Document, QueryLog, Favorite, Feedback
 from ..core.config import settings
@@ -41,15 +41,28 @@ def update_document(doc_id: str, patch: dict) -> dict | None:
                 "icd10_codes": r.icd10_codes, "approval_year": r.approval_year,
                 "needs_review": r.needs_review}
 def search_protocols(q: str) -> list[dict]:
-    ql = (q or "").lower()
-    out = []
-    for d in list_documents():
-        full = get_document(d["document_id"]) or {}
-        hay = (d["title"] + d["nosology"] + str(d["icd10_codes"])
-               + full.get("full_text", "") + str(full.get("sections", ""))[:15000]).lower()
-        if ql in hay or any(t in hay for t in ql.split() if len(t) > 3):
-            out.append({**d, "sections": full.get("sections", {})})
-    return out
+    """Поиск по документам. SQL-пушдаун: LIKE-фильтр по title/nosology/full_text
+    на стороне БД вместо прежнего Python full-scan (22 × 60k символов на каждый
+    запрос). Токены ≤3 символов (МКБ-коды «H66», «J01») ищутся целиком."""
+    ql = (q or "").strip().lower()
+    if not ql:
+        return []
+    terms = [t for t in ql.split() if t] or [ql]
+    with Session(eng) as s:
+        # Каждый термин должен встретиться хотя бы в одном из полей (AND между
+        # терминами, OR между полями — как прежний haystack, но в SQL).
+        cond = and_(*[
+            or_(
+                func.lower(Document.title).contains(t),
+                func.lower(Document.nosology).contains(t),
+                func.lower(Document.full_text).contains(t),
+            ) for t in terms
+        ])
+        rows = s.execute(select(Document).where(cond)).scalars().all()
+        return [{"document_id": r.id, "title": r.title, "nosology": r.nosology,
+                 "icd10_codes": r.icd10_codes, "approval_year": r.approval_year,
+                 "status": r.status, "confidence": r.confidence,
+                 "needs_review": r.needs_review, "sections": r.data} for r in rows]
 def log_query(query: str, intent: str, refused: bool):
     with Session(eng) as s:
         s.add(QueryLog(query=query[:2000], intent=intent, refused=refused)); s.commit()

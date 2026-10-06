@@ -39,6 +39,11 @@ class TTLCache:
         while len(self._d) > self.maxsize:
             self._d.popitem(last=False)
 
+    def clear(self):
+        """Полная инвалидация: вызывается при загрузке нового документа —
+        закэшированные «не найдено» не должны переживать пополнение базы."""
+        self._d.clear()
+
     def stats(self) -> dict:
         total = self.hits + self.misses
         return {"hits": self.hits, "misses": self.misses, "size": len(self._d),
