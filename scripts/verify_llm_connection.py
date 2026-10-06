@@ -66,16 +66,20 @@ def main() -> int:
         return 2
     try:
         r.raise_for_status()
-        text = r.json()["choices"][0]["message"]["content"]
+        text = r.json()["choices"][0]["message"].get("content") or ""
     except Exception as e:
         print(f"[X] неожиданный формат ответа ({r.status_code}): {str(e)[:200]}")
         print("    body:", r.text[:300])
+        return 2
+    if not text.strip():
+        print("[X] провайдер вернул пустой контент (такое бывает у reasoning/free-моделей). "
+              "Для пилота нужна стабильная платная модель.")
         return 2
     print(f"[3/4] ответ получен ({len(text)} символов): {text[:80]!r}")
 
     try:
         deltas = 0
-        with httpx.stream(f"{base}/chat/completions",
+        with httpx.stream("POST", f"{base}/chat/completions",
                           headers={"Authorization": f"Bearer {key}"},
                           json={"model": model,
                                 "messages": [{"role": "user", "content": a.prompt}],

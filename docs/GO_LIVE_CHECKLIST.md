@@ -11,11 +11,13 @@
 - [x] Тесты: backend 61/61, frontend vitest 4/4, build чистый; Lighthouse desktop: perf 1.0 / a11y 0.94
 
 ## B. Требует одного ручного действия пользователя ⬜
-- [ ] **LLM-ключ**: в `.env` вписать `LLM_PROVIDER=openrouter` (или openai),
-  `LLM_API_KEY=<ключ>`, `LLM_MODEL=openai/gpt-4o-mini` (или своя модель),
-  при openrouter — `LLM_BASE_URL=https://openrouter.ai/api/v1`. Перезапустить backend
-  (`scripts/run_local.sh` или свой процесс). Проверить: `python scripts/verify_llm_connection.py`
-  → код 0. Затем smoke: вопрос в чате → ответ идёт потоком; инфаркт → честный отказ.
+- [ ] **LLM-ключ** (ключ вписан 2026-10-06, но OpenRouter отвечает **402 Payment Required**
+  на gpt-4o-mini — на аккаунте нет кредитов; free-модели проверены: rate-limited/пустые,
+  для пилота непригодны): пополнить баланс OpenRouter ($5–10 хватит надолго при таких
+  объёмах) → `python scripts/verify_llm_connection.py` → код 0 → smoke: вопрос в чате
+  идёт потоком, инфаркт → честный отказ. Backend уже перезапущен с openrouter-конфигом
+  и ждёт пополнения. До пополнения чат на реальных вопросах отвечает 500 (провайдер,
+  не наш баг); отказ-уточнения работают.
 - [x] **Реальные PDF**: найдено 22 PDF Минздрава 2023–2025 (`лор клинреки/`, MedElement) —
   все 22 уже в боевой БД (conf=high, needs_review=false). Валидация 2026-10-06
   на 3 документах (Острый синусит 47 стр., Отит средний 36 стр., Паратонзиллярный

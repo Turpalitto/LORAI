@@ -10,12 +10,15 @@ class OpenAICompatibleClient(BaseLLMClient):
                   "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
                   "temperature": 0}, timeout=60)
         r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
+        text = r.json()["choices"][0]["message"].get("content") or ""
+        if not text.strip():
+            raise RuntimeError("Провайдер вернул пустой ответ (модель не сгенерировала контент)")
+        return text
     def stream(self, system: str, user: str):
         """Настоящий токен-стрим (OpenAI-совместимый SSE). Каждая yield —
         дельта контента одного чанка; [DONE] и пустые дельты пропускаются."""
         import json as _json
-        with httpx.stream(f"{settings.LLM_BASE_URL}/chat/completions",
+        with httpx.stream("POST", f"{settings.LLM_BASE_URL}/chat/completions",
                 headers={"Authorization": f"Bearer {settings.LLM_API_KEY}"},
                 json={"model": settings.LLM_MODEL,
                       "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
