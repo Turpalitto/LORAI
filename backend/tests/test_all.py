@@ -51,3 +51,18 @@ def test_chat_stream_pii_refused():
     r = c.get("/chat/stream", params={"query": "Иванов 79001234567"})
     evts = [_json.loads(line[6:]) for line in r.text.splitlines() if line.startswith("data: ")]
     assert evts[-1]["type"] == "done" and evts[-1].get("answer") is None
+def test_answer_stream_matches_answer():
+    """answer_stream (mock) в сборке даёт тот же ответ, что answer():
+    контракт SSE-слоя — фронт не зависит от провайдера."""
+    from app.rag.generator import answer, answer_stream
+    q = "средний отит диагностика лечение"
+    full = answer(q)
+    evts = list(answer_stream(q))
+    assert evts[0]["type"] == "meta" and evts[-1]["type"] == "done"
+    acc = ""
+    for e in evts:
+        if e["type"] == "token":
+            acc += e.get("text", "")
+        elif e["type"] == "corrected":
+            acc = e["text"]
+    assert acc == full["answer"] and evts[-1]["answer"] == full["answer"]

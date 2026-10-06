@@ -68,6 +68,23 @@ def test_upload_pdf_alias_and_dedup():
     assert r2.json()["duplicate"] is True
     n1 = len(c.get("/admin/documents", headers=h).json()["items"])
     assert n1 == n0 + 1, (n0, n1)
+def test_upload_returns_lifecycle_fields_and_searchable():
+    """Полный цикл для UI админки: ответ несёт статус/уверенность/нозологию,
+    документ сразу находится в поиске."""
+    c = _client()
+    tok = c.post("/auth/login", json={"email": "admin@lorai.local", "password": "admin123"}).json()["token"]
+    h = {"Authorization": "Bearer " + tok}
+    import time
+    fname = f"lifecycle_{int(time.time()*1000)}.txt"
+    blob = "Определение\nФарингит J02.9\nДиагностика\nФарингоскопия\nЛечение\nПолоскание\n".encode("utf-8")
+    r = c.post("/admin/upload", headers=h, files={"f": (fname, blob, "text/plain")})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["processing_status"] == "processed"
+    assert j["confidence"] in ("high", "medium", "low")
+    assert "needs_review" in j and "document_id" in j
+    items = c.post("/search-protocol", json={"q": "J02"}).json()["items"]
+    assert any(i["document_id"] == j["document_id"] for i in items)
 def test_upload_broken_pdf_rejected_cleanly():
     c = _client()
     tok = c.post("/auth/login", json={"email": "admin@lorai.local", "password": "admin123"}).json()["token"]

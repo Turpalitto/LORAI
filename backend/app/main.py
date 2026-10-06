@@ -124,36 +124,26 @@ def chat(b: ChatIn, request: Request):
 @app.get("/chat/stream")
 @limiter.limit("30/minute")
 def chat_stream(query: str, request: Request, k: int = 6, session_id: str | None = None):
-    """Потоковый вариант /chat (SSE): сначала событие meta (источники, отказ,
-    сессия), затем answer чанками по словам, в конце done с latency.
-    Ответ вычисляется той же RAG-функцией (честный отказ и цифры сохранены);
-    чанки — транспортная нарезка готового ответа для мгновенного first-token."""
+    """Потоковый вариант /chat (SSE): meta → token* → [corrected] → done.
+    Отказ, уточнения, PII-гейт и проверка цифр — те же, что в /chat
+    (единый _prepare). С живым провайдером токены идут от LLM по мере
+    генерации; с mock — нарезка готового ответа. Фронт одинаковый."""
     import json as _json
+    from .rag.generator import answer_stream
     if _has_pii(query):
         def _pii():
             yield 'data: {"type": "done", "warning": "Не вводите персональные данные пациента!", "answer": null}\n\n'
         return StreamingResponse(_pii(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
     t0 = time.monotonic()
-    r = rag_answer(query, k=k, filters=None, session_id=session_id)
-    r["disclaimer"] = DISCLAIMER
+    events = list(answer_stream(query, k=k, filters=None, session_id=session_id))
     ms = round((time.monotonic() - t0) * 1000, 1)
     record_latency(ms)
-    meta = {k2: r.get(k2) for k2 in ("refused", "intent", "top_score", "sources",
-            "source_map", "doc_count", "session_id", "needs_clarification",
-            "clarifying_question")}
-    meta["type"] = "meta"
-    text = r.get("answer") or ""
-    words = text.split(" ")
     def _gen():
-        yield "data: " + _json.dumps(meta, ensure_ascii=False) + "\n\n"
-        buf: list[str] = []
-        for i, w in enumerate(words):
-            buf.append(w)
-            if len(buf) >= 8 or i == len(words) - 1:
-                yield "data: " + _json.dumps({"type": "token", "text": " ".join(buf) + (" " if i < len(words) - 1 else "")}, ensure_ascii=False) + "\n\n"
-                buf = []
-        yield "data: " + _json.dumps({"type": "done", "latency_ms": ms, "disclaimer": DISCLAIMER}, ensure_ascii=False) + "\n\n"
+        for e in events:
+            if e.get("type") == "done":
+                e = {**e, "latency_ms": ms, "disclaimer": DISCLAIMER}
+            yield "data: " + _json.dumps(e, ensure_ascii=False) + "\n\n"
     return StreamingResponse(_gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 @app.get("/protocols")
@@ -241,7 +231,9 @@ def upload(request: Request, f: UploadFile, user: dict = Depends(admin_only)):
     # запроса — после загрузки нового документа они обязаны учесть его, иначе
     # врач получает «не найдено» для свежезагруженного протокола до конца TTL.
     cache.clear()
-    return {"document_id": doc["document_id"], "icd10": doc["icd10_codes"],
+    return {"document_id": doc["document_id"], "nosology": doc["nosology"],
+            "title": doc["title"], "icd10": doc["icd10_codes"],
+            "processing_status": doc.get("processing_status", "processed"),
             "confidence": doc["extraction_confidence"], "needs_review": doc["needs_manual_review"],
             "duplicate": bool(existing)}
 @app.get("/admin/documents")

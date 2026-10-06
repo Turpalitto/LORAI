@@ -76,6 +76,9 @@ export function Chat() {
             } else if (e.type === 'token') {
               acc += e.text || '';
               setA(acc);
+            } else if (e.type === 'corrected' && e.text) {
+              acc = e.text; // проверка цифр скорректировала ответ — заменяем целиком
+              setA(acc);
             }
           } catch { /* пропуск битого чанка */ }
         }
@@ -96,6 +99,18 @@ export function Chat() {
     try { await api('/feedback', { method: 'POST', body: JSON.stringify({ query: q, vote: v }) }); setVoted(v); }
     catch { setErr('Оценку сохранить не удалось (нужен вход).'); }
   };
+  const [repOpen, setRepOpen] = React.useState(false);
+  const [repText, setRepText] = React.useState('');
+  const [repDone, setRepDone] = React.useState(false);
+  const sendReport = async () => {
+    if (!repText.trim()) return;
+    try {
+      const ctx = `[сессия ${(sid || '').slice(0, 8)}] [score ${meta?.top_score ?? '?'}] ` +
+        `Вопрос: ${q.slice(0, 300)} | Ответ: ${a.slice(0, 500)} || Проблема: ${repText.trim()}`;
+      await api('/feedback', { method: 'POST', body: JSON.stringify({ query: q, vote: -1, comment: ctx.slice(0, 2000) }) });
+      setRepDone(true); setRepOpen(false); setRepText('');
+    } catch { setErr('Сообщить не удалось (нужен вход). Войдите — токен сохраняется.'); }
+  };
   const [confLabel, confBg] = confColor(meta?.top_score);
   return <div><h2>Чат-ассистент (RAG)</h2><p style={{ background: '#fef3c7', padding: 8, borderRadius: 6 }}>⚠️ Не вводите персональные данные пациента (ФИО, паспорт, телефон, СНИЛС).</p><textarea value={q} onChange={e => setQ(e.target.value)} rows={3} style={{ width: '100%' }} /><br /><button onClick={ask} disabled={loading}>{loading ? (streaming ? 'Получаю ответ…' : 'Думаю…') : 'Спросить'}</button>{streaming && <button onClick={() => { (stopRef as any).stop = true; }} style={{ marginLeft: 8 }}>Остановить</button>}{sid && <span style={{ marginLeft: 8, fontSize: 12, color: '#6b7280' }}>сессия {sid.slice(0, 8)}… (помнит контекст)</span>}
     {loading && !a && <div style={{ marginTop: 8 }}><div style={{ background: '#e5e7eb', borderRadius: 6, height: 14, marginBottom: 6 }} /><div style={{ background: '#e5e7eb', borderRadius: 6, height: 14, width: '70%', marginBottom: 6 }} /><div style={{ background: '#e5e7eb', borderRadius: 6, height: 14, width: '40%' }} /></div>}
@@ -107,7 +122,9 @@ export function Chat() {
       {meta?.cached && <span style={{ marginLeft: 6, fontSize: 12, color: '#6b7280' }}>из кэша · {meta?.latency_ms} мс</span>}
       {meta?.doc_count > 1 && <span style={{ marginLeft: 6, fontSize: 12, color: '#6b7280' }}>синтез из {meta.doc_count} документов</span>}
       <pre style={{ whiteSpace: 'pre-wrap', background: '#f3f4f6', padding: 12 }}>{a}{streaming && <span className="stream-caret" aria-hidden="true" />}</pre>
-      <div>Ответ полезен? <button onClick={() => vote(1)} disabled={voted !== 0}>{voted === 1 ? '👍 спасибо!' : '👍'}</button> <button onClick={() => vote(-1)} disabled={voted !== 0}>{voted === -1 ? '👎 принято' : '👎'}</button></div>
+      <div>Ответ полезен? <button onClick={() => vote(1)} disabled={voted !== 0}>{voted === 1 ? '👍 спасибо!' : '👍'}</button> <button onClick={() => vote(-1)} disabled={voted !== 0}>{voted === -1 ? '👎 принято' : '👎'}</button> <button onClick={() => { setRepOpen(!repOpen); setRepDone(false); }} style={{ marginLeft: 8 }}>Сообщить о проблеме</button></div>
+      {repDone && <p style={{ color: '#16a34a' }}>Спасибо! Сообщение с контекстом экрана отправлено разработчикам.</p>}
+      {repOpen && <div style={{ marginTop: 8 }}><label>Что не так с этим ответом?<br /><textarea value={repText} onChange={(e) => setRepText(e.target.value)} rows={2} style={{ width: '100%' }} placeholder="Например: неверная дозировка, не тот протокол…" /></label><br /><button onClick={sendReport} disabled={!repText.trim()}>Отправить (с вопросом, ответом и оценкой — без персональных данных)</button></div>}
     </div>}
     {sources.length > 0 && <details style={{ marginTop: 8 }}><summary>Источники ({sources.length})</summary>{sources.map((s: any, i: number) => <div key={i} style={{ border: '1px solid #ddd', margin: 4, padding: 6 }}>[Документ: {s.document || s.title || s.nosology}, Раздел: {s.section}, Стр.: {Array.isArray(s.page_range) ? s.page_range.join(', ') : s.page_range}] (score={s.score})</div>)}</details>}</div>;
 }
@@ -248,11 +265,34 @@ export function Templates() {
 export function Admin() {
   const [email, setEmail] = React.useState('admin@lorai.local'); const [pw, setPw] = React.useState('admin123'); const [docs, setDocs] = React.useState<any[]>([]);
   const [stats, setStats] = React.useState<any>(null); const [contra, setContra] = React.useState<any[]>([]);
+  const [uploading, setUploading] = React.useState(false);
+  const [upResult, setUpResult] = React.useState<any>(null);
+  const [upError, setUpError] = React.useState('');
   const loginGo = async () => { const { login } = await import('../api/client'); const r = await login(email, pw); localStorage.setItem('token', r.token); setDocs((await api('/admin/documents')).items || []); };
   const loadStats = async () => { setStats(await api('/admin/stats')); };
   const loadContra = async () => { setContra((await api('/contradictions')).items || []); };
-  const upload = async (f: File) => { const fd = new FormData(); fd.append('f', f); const t = localStorage.getItem('token'); const r = await fetch('http://localhost:8000/admin/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + t }, body: fd }); alert(await r.text()); };
-  return <div><h2>Админ-панель</h2><input value={email} onChange={e => setEmail(e.target.value)} /><input type="password" value={pw} onChange={e => setPw(e.target.value)} /><button onClick={loginGo}>Войти и показать документы</button><br />Загрузить PDF: <input type="file" accept=".pdf,.txt" onChange={e => e.target.files && upload(e.target.files[0])} />{docs.map((d: any) => <div key={d.document_id}>{d.nosology} [{(d.icd10_codes || []).join(',')}] conf={d.confidence}</div>)}
+  const upload = async (f: File) => {
+    setUploading(true); setUpError(''); setUpResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('f', f);
+      const t = localStorage.getItem('token');
+      const r = await fetch(API + '/admin/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + t }, body: fd });
+      const text = await r.text();
+      if (!r.ok) throw new Error(text || ('Ошибка ' + r.status));
+      const j = JSON.parse(text);
+      setUpResult(j);
+      setDocs((await api('/admin/documents')).items || []);
+    } catch (e) {
+      setUpError(e instanceof Error && e.message ? e.message.slice(0, 300) : 'Загрузка не удалась. Проверьте соединение и попробуйте снова.');
+    }
+    setUploading(false);
+  };
+  return <div><h2>Админ-панель</h2><input value={email} onChange={e => setEmail(e.target.value)} /><input type="password" value={pw} onChange={e => setPw(e.target.value)} /><button onClick={loginGo}>Войти и показать документы</button><br />Загрузить PDF: <input type="file" accept=".pdf,.txt" disabled={uploading} onChange={e => e.target.files && upload(e.target.files[0])} />
+    {uploading && <p style={{ color: '#6b7280' }}>Обрабатывается: извлечение текста, разделов и кодов МКБ…</p>}
+    {upError && <div style={{ background: '#fef2f2', border: '1px solid #dc2626', padding: 10, borderRadius: 6, marginTop: 8 }}><b>Не удалось обработать файл.</b> {upError}<br /><span style={{ fontSize: 13, color: '#6b7280' }}>Проверьте формат (PDF/TXT до 50 МБ) и попробуйте снова.</span></div>}
+    {upResult && <div style={{ background: '#f0fdf4', border: '1px solid #16a34a', padding: 10, borderRadius: 6, marginTop: 8 }}><b>Готово:</b> {upResult.nosology || upResult.title} [{(upResult.icd10 || []).join(', ')}] · статус {upResult.processing_status} · уверенность {upResult.confidence}{upResult.duplicate ? ' · обновлён существующий документ' : ''}{upResult.needs_review ? ' · ⚠️ требуется ручная проверка (низкая уверенность)' : ''}<br /><a href={'#/protocols'}>Проверить в поиске</a></div>}
+    {docs.map((d: any) => <div key={d.document_id}>{d.nosology} [{(d.icd10_codes || []).join(',')}] conf={d.confidence}</div>)}
     <h3>Аналитика использования</h3><button onClick={loadStats}>Обновить статистику</button>
     {stats ? <div style={{ fontSize: 14 }}>
       <p>Документов: {stats.documents} · Запросов: {stats.queries_total} · Отказов: {stats.queries_refused} ({(stats.refusal_rate * 100).toFixed(1)}%)</p>
