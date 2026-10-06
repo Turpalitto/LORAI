@@ -21,7 +21,7 @@ const LINKS: [string, string][] = [
 ];
 
 function route() {
-  return window.location.hash.replace('#/', '').split('?')[0] || 'chat';
+  return window.location.hash.replace('#/', '').split('?')[0];
 }
 
 function themeInit(): 'light' | 'dark' {
@@ -47,6 +47,17 @@ class Boundary extends React.Component<{ children: React.ReactNode }, { err: str
   }
 }
 
+function NotFound() {
+  return (
+    <div className="card notfound" role="alert">
+      <div className="nf-code num">404</div>
+      <h2>Страница не найдена</h2>
+      <p className="muted">Такого раздела в ЛОРАИ нет — возможно, устаревшая ссылка.</p>
+      <a className="btn" href="#/" style={{ marginTop: 8 }}>На главную</a>
+    </div>
+  );
+}
+
 function InstallPrompt() {
   const [evt, setEvt] = React.useState<any>(null);
   const [dismissed, setDismissed] = React.useState(() => localStorage.getItem('lorai-install-hide') === '1');
@@ -62,11 +73,11 @@ function InstallPrompt() {
   }, []);
   if (!evt || dismissed) return null;
   return (
-    <div className="banner" role="status" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+    <div className="banner" role="status">
       <span>📲 Установите ЛОРАИ на главный экран — откроется как отдельное приложение, ранее просмотренные протоколы доступны офлайн.</span>
       <span className="row">
-        <button className="btn btn-secondary" style={{ minHeight: 44 }} onClick={() => (evt as any).prompt()}>Установить</button>
-        <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => { localStorage.setItem('lorai-install-hide', '1'); setDismissed(true); }}>Позже</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => (evt as any).prompt()}>Установить</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => { localStorage.setItem('lorai-install-hide', '1'); setDismissed(true); }}>Позже</button>
       </span>
     </div>
   );
@@ -95,9 +106,26 @@ export default function App() {
   }, [theme]);
   const r = route();
   const active = r.split('/')[0];
+  React.useEffect(() => {
+    const el = document.querySelector<HTMLElement>('.lorai-nav a[aria-current="page"]');
+    el?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [r]);
+  const page =
+    r === '' ? <Dashboard /> :
+    r === 'chat' ? <Chat /> :
+    r.startsWith('protocols') ? <ProtocolSearch /> :
+    r === 'dosage' ? <DosageCalc /> :
+    r === 'calc' ? <Calculators /> :
+    r === 'diff' ? <DiffDx /> :
+    r === 'referral' ? <Referral /> :
+    r.startsWith('checklist') ? <ChecklistPage /> :
+    r === 'templates' ? <Templates /> :
+    r === 'history' ? <History /> :
+    r === 'admin' ? <Admin /> :
+    <NotFound />;
   return (
     <div className="lorai-shell">
-      <a href="#main" className="caption" style={{ position: 'absolute', left: -9999 }} onFocus={(e) => (e.currentTarget.style.left = '8px')}>
+      <a href="#main" className="skip-link" onFocus={(e) => (e.currentTarget.style.left = '8px')}>
         Перейти к содержимому
       </a>
       <header className="lorai-header">
@@ -110,8 +138,7 @@ export default function App() {
         </div>
         <div style={{ marginLeft: 'auto' }} className="row">
           <button
-            className="btn btn-ghost"
-            style={{ minHeight: 44, padding: '8px 14px' }}
+            className="btn btn-ghost btn-sm"
             onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
             aria-label={theme === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'}
             title="Тема оформления"
@@ -135,19 +162,7 @@ export default function App() {
         ))}
       </nav>
       <main id="main" className="lorai-main fade-in" key={r} tabIndex={-1}>
-        <Boundary>
-          {r === '' && <Dashboard />}
-          {r === 'chat' && <Chat />}
-          {r.startsWith('protocols') && <ProtocolSearch />}
-          {r === 'dosage' && <DosageCalc />}
-          {r === 'calc' && <Calculators />}
-          {r === 'diff' && <DiffDx />}
-          {r === 'referral' && <Referral />}
-          {r.startsWith('checklist') && <ChecklistPage />}
-          {r === 'templates' && <Templates />}
-          {r === 'history' && <History />}
-          {r === 'admin' && <Admin />}
-        </Boundary>
+        <Boundary>{page}</Boundary>
       </main>
       <footer className="lorai-footer">
         <span>ЛОРАИ v{APP_VERSION} · справочный инструмент, решение принимает врач</span>
