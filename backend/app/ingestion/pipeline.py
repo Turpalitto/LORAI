@@ -46,6 +46,114 @@ def chunk_text(text: str, meta: dict, size: int = 1500, overlap: int = 150) -> l
         i += size - overlap
     return chunks or [{**meta, "text": ""}]
 
+
+# Строгие заголовки разделов КР: строка целиком равна названию главы
+# (с необязательной нумерацией и двоеточием). Прежнее правило «строка < 80
+# символов содержит ключевое слово» давало дребезг: 80 переключений раздела на
+# 168 чанков, метки не соответствовали содержимому (см. scripts/check_section_labels.py).
+_HEADING_RX = [
+    ("definition", re.compile(r"^(?:\d+(?:\.\d+)*\.?\s*)?(?:определение|этиология(?: и патогенез)?|"
+                              r"классификация|термины и определения|коды по мкб)\s*[:.]?$", re.I)),
+    ("diagnostics", re.compile(r"^(?:\d+(?:\.\d+)*\.?\s*)?(?:диагностика(?: [а-я]+)?|жалобы|анамнез(?: [а-я]+)?|"
+                               r"физикальное обследование|лабораторные диагностические исследования|"
+                               r"инструментальные диагностические исследования|"
+                               r"дифференциальная диагностика|клиническая картина|критерии установления диагноза)\s*[:.]?$", re.I)),
+    ("treatment", re.compile(r"^(?:\d+(?:\.\d+)*\.?\s*)?(?:лечение(?: [а-я]+)*|терапия|"
+                             r"немедикаментозное лечение|медикаментозное лечение|хирургическое лечение|"
+                             r"реабилитация|обезболивание)\s*[:.]?$", re.I)),
+    ("referral_criteria", re.compile(r"^(?:\d+(?:\.\d+)*\.?\s*)?(?:организация оказания медицинской помощи|"
+                                     r"показания (?:к|для) госпитализации[а-я ]*|показания к оперативному лечению|"
+                                     r"направление[а-я ]*)\s*[:.]?$", re.I)),
+    ("prevention", re.compile(r"^(?:\d+(?:\.\d+)*\.?\s*)?(?:профилактика(?: [а-я]+)*|"
+                              r"диспансерное наблюдение(?: [а-я]+)*|вакцинопрофилактика)\s*[:.]?$", re.I)),
+    ("complications", re.compile(r"^(?:\d+(?:\.\d+)*\.?\s*)?(?:осложнения|прогноз|"
+                                 r"исходы заболевания|неблагоприятные[а-я ]*)\s*[:.]?$", re.I)),
+]
+
+
+# Мусор вёрстки, который не должен становиться «источником» для врача:
+# колонтитулы с датой печати, крошки MedElement, URL, номера страниц.
+_FURNITURE_RX = [
+    re.compile(r"^\s*\d{1,2}\.\d{2}\.\d{4}[,.]?\s*\d{0,2}:?\d{0,2}\s*$"),
+    re.compile(r">\s*Клинические рекомендации|medelement|diseases\.medelement", re.I),
+    re.compile(r"https?://|www\.", re.I),
+    re.compile(r"^\s*\d{1,3}\s*$"),
+]
+# Список литературы: целиком выбрасываем из индекса (это не клинический текст,
+# но именно он раньше попадал в выдачу как «источник» с чужим разделом).
+_REFERENCES_HEADING = re.compile(
+    r"^\s*(?:список литературы|список источников|источники и литература|references|библиографи[а-я]*|литература)\s*[:.]?$", re.I)
+_REF_LINE = re.compile(
+    r"(?:doi:|https?://doi|\bet al\.|С\.\s*\d+\s*[-–]\s*\d+|"
+    r"^\s*[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.\s?[А-ЯЁ]?\.|^\s*\d{1,3}\.\s*[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.)", re.I)
+
+
+def _is_furniture(line: str) -> bool:
+    return any(rx.search(line) for rx in _FURNITURE_RX)
+
+
+def _is_reference_line(line: str) -> bool:
+    return bool(_REF_LINE.search(line))
+
+
+def _section_of_line(line: str) -> str | None:
+    """Раздел, если строка — заголовок главы (строго, целиком)."""
+    ln = (line or "").strip()
+    if not ln or len(ln) > 90:
+        return None
+    for sec, rx in _HEADING_RX:
+        if rx.match(ln):
+            return sec
+    return None
+
+
+def build_index_chunks(pages: list[dict]) -> list[dict]:
+    """Чанки для поискового индекса: документ покрывается РОВНО ОДИН РАЗ,
+    каждый чанк помечен своим разделом и реальными страницами.
+
+    Прежняя схема индексировала три раздела (обрезанных до 6000 символов) плюс
+    весь текст целиком — 84 % корпуса оказывались дублями `general` (1304 из
+    1599 чанков), они вытесняли из топ-6 нужный раздел, и модель отвечала
+    «в контексте нет информации». Замер: docs/RETRIEVAL_EVAL.md.
+    """
+    segments: list[dict] = []  # {section, lines, pages}
+    cur, buf, pages_seen = "general", [], set()
+
+    def flush():
+        if buf:
+            segments.append({"section": cur, "lines": list(buf), "pages": sorted(pages_seen)})
+            buf.clear()
+            pages_seen.clear()
+
+    for p in pages:
+        page_no = p.get("page", 1)
+        for ln in (p.get("text") or "").split("\n"):
+            if _is_furniture(ln) or _is_reference_line(ln):
+                continue  # колонтитулы и библиография в индекс не идут
+            if _REFERENCES_HEADING.match(ln.strip()):
+                flush()
+                cur = "references"
+                continue
+            hit = _section_of_line(ln)
+            if hit and hit != cur:
+                flush()
+                cur = hit
+                continue
+            buf.append(ln)
+            pages_seen.add(page_no)
+    flush()
+
+    chunks: list[dict] = []
+    for seg in segments:
+        if seg["section"] == "references":
+            continue
+        text = "\n".join(seg["lines"])
+        if len(text.strip()) < 40:
+            continue
+        for ch in chunk_text(text, {"section": seg["section"]}):
+            chunks.append({**ch, "page_range": seg["pages"][:10] or [1]})
+    return chunks
+
 def process_pdf(path: str, llm_client=None, title: str | None = None) -> dict:
     import os
     pages = load_pages(path)

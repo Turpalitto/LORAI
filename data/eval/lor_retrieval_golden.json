@@ -1,0 +1,408 @@
+{
+  "version": 1,
+  "note": "Золотой набор для замера поиска ЛОРАИ. Вопросы сформулированы как реальные обращения врача, включая падежные формы (отита, глотке, ухе) — именно на них ломается лексический TF-IDF. protocols — допустимые нозологии (совпадение по подстроке в nosology/document/title), section — ожидаемый раздел чанков (definition|diagnostics|treatment). Поле sections — СПИСОК допустимых разделов: клинический вопрос законно отвечается из нескольких глав (лечение и диагностика), метрика не штрафует за это.",
+  "items": [
+    {
+      "id": "otit-sredniy-1",
+      "q": "острый средний отит у ребёнка 3 лет: антибиотик первой линии и дозировка",
+      "protocols": [
+        "Отит средний острый"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "otit-sredniy-2",
+      "q": "боль в ухе и температура у грудничка, что делать",
+      "protocols": [
+        "Отит средний острый"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "diagnostics",
+        "treatment"
+      ]
+    },
+    {
+      "id": "hron-otit-1",
+      "q": "хронический средний отит: выделения из уха и перфорация барабанной перепонки",
+      "protocols": [
+        "Хронический средний отит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "naruzh-otit-1",
+      "q": "наружный отит после купания: зуд и боль в слуховом проходе",
+      "protocols": [
+        "Наружные отиты"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "gribkov-otit-1",
+      "q": "грибковый отит: плесень в ухе после курса антибиотиков",
+      "protocols": [
+        "Грибковый отит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "paratonz-1",
+      "q": "тризм жевательных мышц и боль при глотании — абсцесс?",
+      "protocols": [
+        "Паратонзиллярный абсцесс"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "diagnostics",
+        "treatment"
+      ]
+    },
+    {
+      "id": "paratonz-2",
+      "q": "когда вскрывать паратонзиллярный абсцесс, показания к дренированию",
+      "protocols": [
+        "Паратонзиллярный абсцесс"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment"
+      ]
+    },
+    {
+      "id": "tonzillit-ostryy-1",
+      "q": "острый тонзиллит: когда нужен антибиотик, шкала Centor",
+      "protocols": [
+        "Острый тонзиллит и фарингит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "tonzillit-hron-1",
+      "q": "хронический тонзиллит: показания к тонзиллэктомии",
+      "protocols": [
+        "Хронический тонзиллит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "referral_criteria"
+      ]
+    },
+    {
+      "id": "adenoidy-1",
+      "q": "гипертрофия аденоидов у ребёнка: храп и дыхание через рот",
+      "protocols": [
+        "Гипертрофия аденоидов"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "adenoidy-2",
+      "q": "аденоидит 2 степени у ребёнка 5 лет — аденотомия?",
+      "protocols": [
+        "Гипертрофия аденоидов"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "referral_criteria"
+      ]
+    },
+    {
+      "id": "laringit-ostryy-1",
+      "q": "острый ларингит: осиплость голоса и боль при разговоре",
+      "protocols": [
+        "Острый ларингит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "krup-1",
+      "q": "лающий кашель и инспираторный стридор у ребёнка ночью — круп",
+      "protocols": [
+        "Острый обструктивный ларингит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "krup-2",
+      "q": "эпиглоттит: слюнотечение, поза треножника, срочная тактика",
+      "protocols": [
+        "Острый обструктивный ларингит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment"
+      ]
+    },
+    {
+      "id": "sinusit-1",
+      "q": "острый синусит: гнойные выделения из носа более 10 дней, нужен ли антибиотик",
+      "protocols": [
+        "Острый синусит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "sinusit-2",
+      "q": "боль в проекции верхнечелюстной пазухи, заложенность носа, температура",
+      "protocols": [
+        "Острый синусит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "diagnostics",
+        "treatment"
+      ]
+    },
+    {
+      "id": "polipoz-1",
+      "q": "полипозный риносинусит: потеря обоняния и носовые полипы, лечение",
+      "protocols": [
+        "Полипозный риносинусит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "allerg-1",
+      "q": "аллергический ринит: сезонное чихание, зуд в носу, заложенность",
+      "protocols": [
+        "Аллергический ринит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "peregorodka-1",
+      "q": "искривление перегородки носа: затруднение носового дыхания, показания к операции",
+      "protocols": [
+        "Деформация перегородки носа"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "referral_criteria"
+      ]
+    },
+    {
+      "id": "travma-nosa-1",
+      "q": "травма носа: кровотечение и отёк после удара, что делать",
+      "protocols": [
+        "Травма носа"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "diagnostics",
+        "treatment"
+      ]
+    },
+    {
+      "id": "travma-uha-1",
+      "q": "травма уха: кровотечение из слухового прохода после удара",
+      "protocols": [
+        "Травма уха"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "diagnostics",
+        "treatment",
+        "referral_criteria"
+      ]
+    },
+    {
+      "id": "travma-gortani-1",
+      "q": "травма гортани: осиплость и боль в шее после удара",
+      "protocols": [
+        "Травма гортани"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "diagnostics",
+        "treatment"
+      ]
+    },
+    {
+      "id": "mener-1",
+      "q": "болезнь Меньера: приступы головокружения, шум в ухе и снижение слуха",
+      "protocols": [
+        "Болезнь Меньера"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "diagnostics",
+        "treatment"
+      ]
+    },
+    {
+      "id": "otoskleroz-1",
+      "q": "отосклероз: прогрессирующее снижение слуха, операция на стремени",
+      "protocols": [
+        "Отосклероз"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "nst-1",
+      "q": "нейросенсорная тугоухость у взрослого: слухопротезирование и лечение",
+      "protocols": [
+        "Нейросенсорная тугоухость"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "shum-sluh-1",
+      "q": "потеря слуха от шума: работа в цеху без берушей, профилактика",
+      "protocols": [
+        "Потеря слуха, вызванная шумом"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "prevention",
+        "diagnostics",
+        "treatment"
+      ]
+    },
+    {
+      "id": "opuholi-1",
+      "q": "доброкачественная опухоль околоносовой пазухи: остеома, тактика",
+      "protocols": [
+        "остеогенные и хондрогенные опухоли"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "dose-amox-1",
+      "q": "амоксициллин ребёнку 20 кг при отите: доза в мг/кг",
+      "protocols": [
+        "Отит средний острый"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment"
+      ]
+    },
+    {
+      "id": "gospitaliz-1",
+      "q": "показания к госпитализации при паратонзиллярном абсцессе",
+      "protocols": [
+        "Паратонзиллярный абсцесс"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "treatment",
+        "referral_criteria"
+      ]
+    },
+    {
+      "id": "dif-1",
+      "q": "дифференциальная диагностика оталгии и лихорадки",
+      "protocols": [
+        "Отит средний острый",
+        "Наружные отиты",
+        "Хронический средний отит"
+      ],
+      "kind": "in_domain",
+      "sections": [
+        "diagnostics"
+      ]
+    },
+    {
+      "id": "out-infarkt",
+      "q": "как лечить инфаркт миокарда в первые часы",
+      "protocols": [],
+      "section": null,
+      "kind": "out_of_domain"
+    },
+    {
+      "id": "out-diabet",
+      "q": "сахарный диабет 2 типа: целевой уровень гликированного гемоглобина",
+      "protocols": [],
+      "section": null,
+      "kind": "out_of_domain"
+    },
+    {
+      "id": "out-pnevmoniya",
+      "q": "внебольничная пневмония у взрослых: выбор антибиотика",
+      "protocols": [],
+      "section": null,
+      "kind": "out_of_domain"
+    },
+    {
+      "id": "out-depressiya",
+      "q": "депрессия: как подобрать антидепрессант",
+      "protocols": [],
+      "section": null,
+      "kind": "out_of_domain"
+    },
+    {
+      "id": "out-appendix",
+      "q": "острый аппендицит: признаки и операция",
+      "protocols": [],
+      "section": null,
+      "kind": "out_of_domain"
+    },
+    {
+      "id": "out-perelom",
+      "q": "перелом шейки бедра у пожилого: эндопротезирование",
+      "protocols": [],
+      "section": null,
+      "kind": "out_of_domain"
+    }
+  ]
+}

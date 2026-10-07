@@ -9,3 +9,14 @@ node_modules/
 frontend/dist/
 .venv/
 *.pkl
+data/hf_cache/
+.uvcache/
+# артефакты инструментов и локальные скриншоты
+.freebuff/
+.mimosa/
+.playwright-mcp/
+.v2c/
+.video_agent/
+frontend/test-results/
+playwright-report/
+lorai-home.png

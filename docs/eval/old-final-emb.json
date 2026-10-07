@@ -1,0 +1,966 @@
+{
+  "summary": {
+    "backend": "embeddings [intfloat/multilingual-e5-base]",
+    "threshold": 0.8,
+    "k": 6,
+    "n_in_domain": 30,
+    "n_out_of_domain": 6,
+    "recall_at_k": 0.9333,
+    "mrr_at_k": 0.9524,
+    "recall_at_1": 0.8667,
+    "section_at_k": 0.6333,
+    "protocol_and_section_at_k": 0.6,
+    "section_at_k_relaxed": 1.0,
+    "routing": false,
+    "general_cap": null,
+    "false_refusal_rate": 0.0,
+    "out_refusal_rate": 1.0,
+    "top_score_in_domain": {
+      "min": 0.8511,
+      "median": 0.8786,
+      "max": 0.9133
+    },
+    "top_score_out_of_domain": {
+      "median": 0.8453,
+      "max": 0.8643
+    }
+  },
+  "rows": [
+    {
+      "id": "otit-sredniy-1",
+      "kind": "in_domain",
+      "q": "острый средний отит у ребёнка 3 лет: антибиотик первой линии и дозировка",
+      "top_score": 0.8867,
+      "rank": 1,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Отит средний острый ",
+        "Отит средний острый ",
+        "Отит средний острый ",
+        "Отит средний острый ",
+        "Отит средний острый ",
+        "Отит средний острый "
+      ]
+    },
+    {
+      "id": "otit-sredniy-2",
+      "kind": "in_domain",
+      "q": "боль в ухе и температура у грудничка, что делать",
+      "top_score": 0.8511,
+      "rank": null,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "treatment",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Гипертрофия аденоидов",
+        "Травма носа ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый ларингит ",
+        "Гипертрофия аденоидов"
+      ]
+    },
+    {
+      "id": "hron-otit-1",
+      "kind": "in_domain",
+      "q": "хронический средний отит: выделения из уха и перфорация барабанной перепонки",
+      "top_score": 0.8944,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "definition",
+        "diagnostics",
+        "diagnostics",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Хронический средний отит ",
+        "Отит средний острый ",
+        "Отит средний острый ",
+        "Хронический средний отит ",
+        "Хронический средний отит ",
+        "Отит средний острый "
+      ]
+    },
+    {
+      "id": "naruzh-otit-1",
+      "kind": "in_domain",
+      "q": "наружный отит после купания: зуд и боль в слуховом проходе",
+      "top_score": 0.8721,
+      "rank": 2,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "diagnostics",
+        "diagnostics",
+        "general"
+      ],
+      "docs": [
+        "Грибковый отит ",
+        "Наружные отиты ",
+        "Грибковый отит ",
+        "Грибковый отит ",
+        "Наружные отиты ",
+        "Наружные отиты "
+      ]
+    },
+    {
+      "id": "gribkov-otit-1",
+      "kind": "in_domain",
+      "q": "грибковый отит: плесень в ухе после курса антибиотиков",
+      "top_score": 0.8802,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "definition",
+        "general",
+        "treatment",
+        "definition",
+        "general"
+      ],
+      "docs": [
+        "Грибковый отит ",
+        "Грибковый отит ",
+        "Грибковый отит ",
+        "Грибковый отит ",
+        "Грибковый отит ",
+        "Грибковый отит "
+      ]
+    },
+    {
+      "id": "paratonz-1",
+      "kind": "in_domain",
+      "q": "тризм жевательных мышц и боль при глотании — абсцесс?",
+      "top_score": 0.8781,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "treatment",
+        "general",
+        "general",
+        "general",
+        "treatment",
+        "definition"
+      ],
+      "docs": [
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани "
+      ]
+    },
+    {
+      "id": "paratonz-2",
+      "kind": "in_domain",
+      "q": "когда вскрывать паратонзиллярный абсцесс, показания к дренированию",
+      "top_score": 0.8998,
+      "rank": 1,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс "
+      ]
+    },
+    {
+      "id": "tonzillit-ostryy-1",
+      "kind": "in_domain",
+      "q": "острый тонзиллит: когда нужен антибиотик, шкала Centor",
+      "top_score": 0.867,
+      "rank": 1,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Острый тонзиллит и фарингит ",
+        "Острый тонзиллит и фарингит ",
+        "Острый тонзиллит и фарингит ",
+        "Хронический тонзиллит ",
+        "Острый тонзиллит и фарингит ",
+        "Отит средний острый "
+      ]
+    },
+    {
+      "id": "tonzillit-hron-1",
+      "kind": "in_domain",
+      "q": "хронический тонзиллит: показания к тонзиллэктомии",
+      "top_score": 0.8741,
+      "rank": 1,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Хронический тонзиллит ",
+        "Хронический тонзиллит ",
+        "Хронический тонзиллит ",
+        "Хронический тонзиллит ",
+        "Хронический тонзиллит ",
+        "Хронический тонзиллит "
+      ]
+    },
+    {
+      "id": "adenoidy-1",
+      "kind": "in_domain",
+      "q": "гипертрофия аденоидов у ребёнка: храп и дыхание через рот",
+      "top_score": 0.8773,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "diagnostics",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов"
+      ]
+    },
+    {
+      "id": "adenoidy-2",
+      "kind": "in_domain",
+      "q": "аденоидит 2 степени у ребёнка 5 лет — аденотомия?",
+      "top_score": 0.8716,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "diagnostics",
+        "treatment",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов"
+      ]
+    },
+    {
+      "id": "laringit-ostryy-1",
+      "kind": "in_domain",
+      "q": "острый ларингит: осиплость голоса и боль при разговоре",
+      "top_score": 0.877,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "diagnostics",
+        "diagnostics",
+        "general",
+        "treatment",
+        "definition",
+        "general"
+      ],
+      "docs": [
+        "Острый ларингит ",
+        "Острый ларингит ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый ларингит ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый ларингит "
+      ]
+    },
+    {
+      "id": "krup-1",
+      "kind": "in_domain",
+      "q": "лающий кашель и инспираторный стридор у ребёнка ночью — круп",
+      "top_score": 0.8756,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "diagnostics",
+        "general",
+        "diagnostics"
+      ],
+      "docs": [
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Гипертрофия аденоидов"
+      ]
+    },
+    {
+      "id": "krup-2",
+      "kind": "in_domain",
+      "q": "эпиглоттит: слюнотечение, поза треножника, срочная тактика",
+      "top_score": 0.8626,
+      "rank": 1,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый тонзиллит и фарингит ",
+        "Острый ларингит ",
+        "Острый тонзиллит и фарингит ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани "
+      ]
+    },
+    {
+      "id": "sinusit-1",
+      "kind": "in_domain",
+      "q": "острый синусит: гнойные выделения из носа более 10 дней, нужен ли антибиотик",
+      "top_score": 0.8925,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "treatment",
+        "general",
+        "definition",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Острый синусит ",
+        "Острый синусит ",
+        "Острый синусит ",
+        "Острый синусит ",
+        "Острый синусит ",
+        "Острый синусит "
+      ]
+    },
+    {
+      "id": "sinusit-2",
+      "kind": "in_domain",
+      "q": "боль в проекции верхнечелюстной пазухи, заложенность носа, температура",
+      "top_score": 0.8767,
+      "rank": 6,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "treatment",
+        "treatment",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Полипозный риносинусит ",
+        "Доброкачественные остеогенные и хондрогенные опухоли носа и околоносовых пазух ",
+        "Полипозный риносинусит ",
+        "Доброкачественные остеогенные и хондрогенные опухоли носа и околоносовых пазух ",
+        "Полипозный риносинусит ",
+        "Острый синусит "
+      ]
+    },
+    {
+      "id": "polipoz-1",
+      "kind": "in_domain",
+      "q": "полипозный риносинусит: потеря обоняния и носовые полипы, лечение",
+      "top_score": 0.8917,
+      "rank": 1,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "definition",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Полипозный риносинусит ",
+        "Полипозный риносинусит ",
+        "Полипозный риносинусит ",
+        "Полипозный риносинусит ",
+        "Полипозный риносинусит ",
+        "Полипозный риносинусит "
+      ]
+    },
+    {
+      "id": "allerg-1",
+      "kind": "in_domain",
+      "q": "аллергический ринит: сезонное чихание, зуд в носу, заложенность",
+      "top_score": 0.8951,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "treatment",
+        "definition",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Аллергический ринит ",
+        "Аллергический ринит ",
+        "Аллергический ринит ",
+        "Аллергический ринит ",
+        "Аллергический ринит ",
+        "Аллергический ринит "
+      ]
+    },
+    {
+      "id": "peregorodka-1",
+      "kind": "in_domain",
+      "q": "искривление перегородки носа: затруднение носового дыхания, показания к операции",
+      "top_score": 0.9133,
+      "rank": 1,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "diagnostics",
+        "general",
+        "definition",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Деформация перегородки носа ",
+        "Деформация перегородки носа ",
+        "Деформация перегородки носа ",
+        "Деформация перегородки носа ",
+        "Деформация перегородки носа ",
+        "Деформация перегородки носа "
+      ]
+    },
+    {
+      "id": "travma-nosa-1",
+      "kind": "in_domain",
+      "q": "травма носа: кровотечение и отёк после удара, что делать",
+      "top_score": 0.8704,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "treatment",
+        "diagnostics",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Травма носа ",
+        "Травма носа ",
+        "Травма носа ",
+        "Травма носа ",
+        "Травма носа ",
+        "Травма носа "
+      ]
+    },
+    {
+      "id": "travma-uha-1",
+      "kind": "in_domain",
+      "q": "травма уха: кровотечение из слухового прохода после удара",
+      "top_score": 0.8792,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "treatment",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Травма уха ",
+        "Травма уха ",
+        "Травма уха ",
+        "Травма уха ",
+        "Травма уха ",
+        "Травма уха "
+      ]
+    },
+    {
+      "id": "travma-gortani-1",
+      "kind": "in_domain",
+      "q": "травма гортани: осиплость и боль в шее после удара",
+      "top_score": 0.8767,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "treatment",
+        "general",
+        "definition",
+        "general"
+      ],
+      "docs": [
+        "Травма гортани ",
+        "Травма гортани ",
+        "Травма гортани ",
+        "Травма гортани ",
+        "Травма гортани ",
+        "Травма гортани "
+      ]
+    },
+    {
+      "id": "mener-1",
+      "kind": "in_domain",
+      "q": "болезнь Меньера: приступы головокружения, шум в ухе и снижение слуха",
+      "top_score": 0.8903,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "definition",
+        "general",
+        "general",
+        "treatment",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Болезнь Меньера ",
+        "Болезнь Меньера ",
+        "Болезнь Меньера ",
+        "Болезнь Меньера ",
+        "Болезнь Меньера ",
+        "Болезнь Меньера "
+      ]
+    },
+    {
+      "id": "otoskleroz-1",
+      "kind": "in_domain",
+      "q": "отосклероз: прогрессирующее снижение слуха, операция на стремени",
+      "top_score": 0.881,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "diagnostics"
+      ],
+      "docs": [
+        "Отосклероз ",
+        "Отосклероз ",
+        "Отосклероз ",
+        "Отосклероз ",
+        "Отосклероз ",
+        "Отосклероз "
+      ]
+    },
+    {
+      "id": "nst-1",
+      "kind": "in_domain",
+      "q": "нейросенсорная тугоухость у взрослого: слухопротезирование и лечение",
+      "top_score": 0.8995,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "treatment",
+        "general",
+        "definition",
+        "general"
+      ],
+      "docs": [
+        "Нейросенсорная тугоухость у взрослых ",
+        "Нейросенсорная тугоухость у взрослых ",
+        "Нейросенсорная тугоухость у взрослых ",
+        "Нейросенсорная тугоухость у взрослых ",
+        "Нейросенсорная тугоухость у взрослых ",
+        "Нейросенсорная тугоухость у взрослых "
+      ]
+    },
+    {
+      "id": "shum-sluh-1",
+      "kind": "in_domain",
+      "q": "потеря слуха от шума: работа в цеху без берушей, профилактика",
+      "top_score": 0.8669,
+      "rank": 1,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Потеря слуха, вызванная шумом ",
+        "Потеря слуха, вызванная шумом ",
+        "Потеря слуха, вызванная шумом ",
+        "Потеря слуха, вызванная шумом ",
+        "Потеря слуха, вызванная шумом ",
+        "Потеря слуха, вызванная шумом "
+      ]
+    },
+    {
+      "id": "opuholi-1",
+      "kind": "in_domain",
+      "q": "доброкачественная опухоль околоносовой пазухи: остеома, тактика",
+      "top_score": 0.8837,
+      "rank": 1,
+      "refused": false,
+      "section_hit": true,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "treatment",
+        "general"
+      ],
+      "docs": [
+        "Доброкачественные остеогенные и хондрогенные опухоли носа и околоносовых пазух ",
+        "Доброкачественные остеогенные и хондрогенные опухоли носа и околоносовых пазух ",
+        "Доброкачественные остеогенные и хондрогенные опухоли носа и околоносовых пазух ",
+        "Доброкачественные остеогенные и хондрогенные опухоли носа и околоносовых пазух ",
+        "Доброкачественные остеогенные и хондрогенные опухоли носа и околоносовых пазух ",
+        "Доброкачественные остеогенные и хондрогенные опухоли носа и околоносовых пазух "
+      ]
+    },
+    {
+      "id": "dose-amox-1",
+      "kind": "in_domain",
+      "q": "амоксициллин ребёнку 20 кг при отите: доза в мг/кг",
+      "top_score": 0.891,
+      "rank": 1,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Отит средний острый ",
+        "Отит средний острый ",
+        "Острый ларингит ",
+        "Острый синусит ",
+        "Отит средний острый ",
+        "Паратонзиллярный абсцесс "
+      ]
+    },
+    {
+      "id": "gospitaliz-1",
+      "kind": "in_domain",
+      "q": "показания к госпитализации при паратонзиллярном абсцессе",
+      "top_score": 0.9038,
+      "rank": 1,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс ",
+        "Паратонзиллярный абсцесс "
+      ]
+    },
+    {
+      "id": "dif-1",
+      "kind": "in_domain",
+      "q": "дифференциальная диагностика оталгии и лихорадки",
+      "top_score": 0.8671,
+      "rank": null,
+      "refused": false,
+      "section_hit": false,
+      "section_hit_relaxed": true,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Острый тонзиллит и фарингит ",
+        "Острый тонзиллит и фарингит ",
+        "Острый тонзиллит и фарингит ",
+        "Острый тонзиллит и фарингит ",
+        "Острый тонзиллит и фарингит ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани "
+      ]
+    },
+    {
+      "id": "out-infarkt",
+      "kind": "out_of_domain",
+      "q": "как лечить инфаркт миокарда в первые часы",
+      "top_score": 0.8344,
+      "rank": null,
+      "refused": true,
+      "section_hit": null,
+      "section_hit_relaxed": null,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Острый ларингит ",
+        "Нейросенсорная тугоухость у взрослых ",
+        "Болезнь Меньера ",
+        "Отосклероз ",
+        "Болезнь Меньера ",
+        "Паратонзиллярный абсцесс "
+      ]
+    },
+    {
+      "id": "out-diabet",
+      "kind": "out_of_domain",
+      "q": "сахарный диабет 2 типа: целевой уровень гликированного гемоглобина",
+      "top_score": 0.8443,
+      "rank": null,
+      "refused": true,
+      "section_hit": null,
+      "section_hit_relaxed": null,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Грибковый отит ",
+        "Наружные отиты ",
+        "Хронический тонзиллит ",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани "
+      ]
+    },
+    {
+      "id": "out-pnevmoniya",
+      "kind": "out_of_domain",
+      "q": "внебольничная пневмония у взрослых: выбор антибиотика",
+      "top_score": 0.8643,
+      "rank": null,
+      "refused": true,
+      "section_hit": null,
+      "section_hit_relaxed": null,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Острый ларингит ",
+        "Отит средний острый ",
+        "Гипертрофия аденоидов",
+        "Отит средний острый ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый тонзиллит и фарингит "
+      ]
+    },
+    {
+      "id": "out-depressiya",
+      "kind": "out_of_domain",
+      "q": "депрессия: как подобрать антидепрессант",
+      "top_score": 0.8303,
+      "rank": null,
+      "refused": true,
+      "section_hit": null,
+      "section_hit_relaxed": null,
+      "sections": [
+        "general",
+        "general",
+        "treatment",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Гипертрофия аденоидов",
+        "Острый тонзиллит и фарингит ",
+        "Травма носа ",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов",
+        "Гипертрофия аденоидов"
+      ]
+    },
+    {
+      "id": "out-appendix",
+      "kind": "out_of_domain",
+      "q": "острый аппендицит: признаки и операция",
+      "top_score": 0.851,
+      "rank": null,
+      "refused": true,
+      "section_hit": null,
+      "section_hit_relaxed": null,
+      "sections": [
+        "definition",
+        "diagnostics",
+        "general",
+        "definition",
+        "general",
+        "diagnostics"
+      ],
+      "docs": [
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани ",
+        "Острый обструктивный ларингит [круп], эпиглоттит, постинтубационный отек гортани "
+      ]
+    },
+    {
+      "id": "out-perelom",
+      "kind": "out_of_domain",
+      "q": "перелом шейки бедра у пожилого: эндопротезирование",
+      "top_score": 0.8462,
+      "rank": null,
+      "refused": true,
+      "section_hit": null,
+      "section_hit_relaxed": null,
+      "sections": [
+        "general",
+        "general",
+        "general",
+        "general",
+        "general",
+        "general"
+      ],
+      "docs": [
+        "Болезнь Меньера ",
+        "Травма носа ",
+        "Отосклероз ",
+        "Травма гортани ",
+        "Травма уха ",
+        "Потеря слуха, вызванная шумом "
+      ]
+    }
+  ]
+}

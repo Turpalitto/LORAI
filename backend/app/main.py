@@ -14,7 +14,8 @@ from .ingestion.pipeline import process_pdf
 from .features import dosage_calculator as dose, differential_diagnosis as dd
 from .features import checklist_generator as chk, report_templates as tpl, referral_criteria as ref
 from .core.cache import cache, record_latency, avg_latency
-import os, re, tempfile, time
+from .rag import generator as rag_gen
+import os, re, tempfile, time, json
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="LORAI — помощник ЛОР-врача")
@@ -85,8 +86,12 @@ def health():
         chunks = -1; vec_ok = f"vector error: {e}"
     from .core.config import settings as _s
     llm_configured = _s.LLM_PROVIDER != "mock" and bool(_s.LLM_API_KEY)
+    try:
+        retrieval = vs().stats()
+    except Exception as e:
+        retrieval = {"backend": "недоступен", "note": str(e)[:120]}
     return {"ok": db_ok is True and vec_ok is True, "db": db_ok, "documents": docs,
-            "vector_store": vec_ok, "chunks": chunks,
+            "vector_store": vec_ok, "chunks": chunks, "retrieval": retrieval,
             "llm_configured": llm_configured,
             "llm_mode": ("api:" + _s.LLM_PROVIDER) if llm_configured else "mock",
             "cache": cache.stats(), "avg_latency_ms": avg_latency(),
@@ -121,31 +126,57 @@ def chat(b: ChatIn, request: Request):
     record_latency(ms)
     r["latency_ms"] = ms
     return r
+# SSE-заголовки: no-cache и отключение буферизации nginx — без второго
+# «поток» снова склеивается в один пакет на прод-прокси.
+_SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+_PII_WARNING = "Не вводите персональные данные пациента!"
+
+def _sse(obj: dict) -> str:
+    return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
+
+def _sse_events(query: str, k: int, session_id: str | None, filters: dict | None = None):
+    """Ленивый генератор SSE: отдаёт события по мере генерации. Раньше здесь
+    стоял list(answer_stream(...)) — весь ответ собирался до старта ответа,
+    TTFB равнялся полному времени генерации (фронт «стримил» фейково).
+    latency_ms/record_latency считаются от старта до события done."""
+    t0 = time.monotonic()
+    for e in rag_gen.answer_stream(query, k=k, filters=filters, session_id=session_id):
+        if e.get("type") == "done":
+            ms = round((time.monotonic() - t0) * 1000, 1)
+            record_latency(ms)
+            e = {**e, "latency_ms": ms, "disclaimer": DISCLAIMER}
+        yield _sse(e)
+
+def _chat_stream_response(query: str, k: int, session_id: str | None,
+                          filters: dict | None = None) -> StreamingResponse:
+    """Общий ответ GET/POST /chat/stream: ПДн-гейт проверяется до генерации
+    (одно событие done, LLM не вызывается), иначе — ленивый SSE-поток."""
+    if _has_pii(query):
+        def _pii():
+            yield _sse({"type": "done", "warning": _PII_WARNING, "answer": None})
+        return StreamingResponse(_pii(), media_type="text/event-stream", headers=_SSE_HEADERS)
+    return StreamingResponse(_sse_events(query, k, session_id, filters),
+                             media_type="text/event-stream", headers=_SSE_HEADERS)
+
 @app.get("/chat/stream")
 @limiter.limit("30/minute")
 def chat_stream(query: str, request: Request, k: int = 6, session_id: str | None = None):
-    """Потоковый вариант /chat (SSE): meta → token* → [corrected] → done.
-    Отказ, уточнения, PII-гейт и проверка цифр — те же, что в /chat
-    (единый _prepare). С живым провайдером токены идут от LLM по мере
-    генерации; с mock — нарезка готового ответа. Фронт одинаковый."""
-    import json as _json
-    from .rag.generator import answer_stream
-    if _has_pii(query):
-        def _pii():
-            yield 'data: {"type": "done", "warning": "Не вводите персональные данные пациента!", "answer": null}\n\n'
-        return StreamingResponse(_pii(), media_type="text/event-stream",
-                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    t0 = time.monotonic()
-    events = list(answer_stream(query, k=k, filters=None, session_id=session_id))
-    ms = round((time.monotonic() - t0) * 1000, 1)
-    record_latency(ms)
-    def _gen():
-        for e in events:
-            if e.get("type") == "done":
-                e = {**e, "latency_ms": ms, "disclaimer": DISCLAIMER}
-            yield "data: " + _json.dumps(e, ensure_ascii=False) + "\n\n"
-    return StreamingResponse(_gen(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    """GET-вариант (обратная совместимость): вопрос в query string.
+    Потоковый /chat (SSE): meta → token* → [corrected] → done. Отказ,
+    уточнения и проверка цифр — те же, что в /chat (единый _prepare).
+    Предпочтителен POST /chat/stream (см. ниже)."""
+    return _chat_stream_response(query, k, session_id)
+
+@app.post("/chat/stream")
+@limiter.limit("30/minute")
+def chat_stream_post(b: ChatIn, request: Request):
+    """POST-вариант /chat/stream — предпочтительный: клинический текст уходит
+    телом запроса и не оседает в access-логах, истории браузера и прокси
+    (в GET он попадал в query string). Формат SSE идентичен GET."""
+    f = {}
+    if b.nosology: f["nosology"] = b.nosology
+    if b.icd10: f["icd10"] = b.icd10
+    return _chat_stream_response(b.query, b.k, b.session_id, f or None)
 @app.get("/protocols")
 def protocols(q: str = ""):
     # пустой запрос = листинг метаданных (дашборд «протоколы базы»);
@@ -289,7 +320,21 @@ def add_fav(b: FavIn, user: dict = Depends(auth)):
     return repo.add_favorite(user.get("sub", "doctor"), b.doc_id, b.note)
 @app.get("/favorites")
 def list_fav(user: dict = Depends(auth)):
-    return {"items": repo.list_favorites(user.get("sub", "doctor"))}
+    """Избранное врача. К doc_id добавляем человекочитаемые поля протокола
+    (nosology/title/icd10_codes), иначе UI показывает только непрозрачный id.
+    Отсутствующий/удалённый протокол не роняет эндпоинт — поля остаются
+    пустыми."""
+    items = repo.list_favorites(user.get("sub", "doctor"))
+    try:
+        docs = {d["document_id"]: d for d in repo.list_documents()}
+    except Exception:
+        docs = {}
+    for it in items:
+        d = docs.get(it.get("doc_id")) or {}
+        it["nosology"] = d.get("nosology", "")
+        it["title"] = d.get("title", "")
+        it["icd10_codes"] = d.get("icd10_codes", [])
+    return {"items": items}
 @app.delete("/favorites/{fav_id}")
 def del_fav(fav_id: int, user: dict = Depends(auth)):
     if not repo.remove_favorite(user.get("sub", "doctor"), fav_id):

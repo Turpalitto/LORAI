@@ -1,9 +1,9 @@
 from ..knowledge_base.vector_store import VectorStore
 from ..knowledge_base import repository as repo
 from ..core.config import settings
-from .retriever import classify_intent
+from .retriever import classify_intent, retrieve
 from .prompt_builder import build_prompt
-from .anti_hallucination import should_refuse, check_numbers, REFUSAL
+from .anti_hallucination import should_refuse, check_numbers, effective_threshold, REFUSAL
 from .clarify import clarifying_question
 from .sessions import expand_query, remember, new_session_id
 from ..llm_clients.mock import MockLLMClient
@@ -55,10 +55,12 @@ def _prepare(query: str, k: int = 6, filters: dict | None = None,
             "answer": REFUSAL, "refused": True, "intent": intent,
             "top_score": 0.0, "sources": [], "session_id": sid}}
     eff = expand_query(query, session_id)
-    chunks = vs().search(eff, k=k, filters=filters)
+    # Единая точка поиска: маршрутизация вопроса по разделам протокола
+    # (лечение → treatment, диагностика → diagnostics) — см. rag/retriever.py.
+    chunks = retrieve(vs(), eff, k=k, filters=filters)
     top = max((c.get("score", 0) for c in chunks), default=0)
     smap = _source_map(chunks)
-    if should_refuse(chunks, settings.LLM_THRESHOLD, eff):
+    if should_refuse(chunks, effective_threshold(vs().backend), eff):
         remember(sid, query)
         repo.log_query(query, intent, True)
         return {"kind": "refused", "result": {

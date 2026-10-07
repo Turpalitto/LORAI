@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "note": "HOLD-OUT набор: составлен ПОСЛЕ настройки маршрутизации и словаря маркеров и НЕ использовался для их правки. Формулировки другие (разговорные, «чем лечить», «что проверить»), чтобы проверить обобщение, а не подгонку. Метрики считаются как есть.",
+  "items": [
+    { "id": "h-otit-1", "q": "чем лечить острый гнойный средний отит у взрослого", "protocols": ["Отит средний острый", "Хронический средний отит"], "sections": ["treatment"], "kind": "in_domain" },
+    { "id": "h-otit-2", "q": "у ребёнка 2 года отит и температура 39 — что назначить", "protocols": ["Отит средний острый"], "sections": ["treatment", "diagnostics"], "kind": "in_domain" },
+    { "id": "h-naruzh-1", "q": "какие капли капать в ухо при наружном отите", "protocols": ["Наружные отиты"], "sections": ["treatment"], "kind": "in_domain" },
+    { "id": "h-gribok-1", "q": "после антибиотиков в ухе появился налёт и зуд", "protocols": ["Грибковый отит"], "sections": ["treatment", "diagnostics"], "kind": "in_domain" },
+    { "id": "h-hron-otit-1", "q": "хронический отит: дырка в перепонке и запах из уха", "protocols": ["Хронический средний отит"], "sections": ["treatment", "diagnostics"], "kind": "in_domain" },
+    { "id": "h-otoskleroz-1", "q": "нужна ли операция при отосклерозе и как её делают", "protocols": ["Отосклероз"], "sections": ["treatment"], "kind": "in_domain" },
+    { "id": "h-mener-1", "q": "кружится голова приступами, ухо заложило и шумит", "protocols": ["Болезнь Меньера"], "sections": ["diagnostics", "treatment"], "kind": "in_domain" },
+    { "id": "h-nst-1", "q": "шум в ушах и снижение слуха у пожилого: что проверить", "protocols": ["Нейросенсорная тугоухость"], "sections": ["diagnostics", "treatment"], "kind": "in_domain" },
+    { "id": "h-shum-1", "q": "после концерта заложило уши и звенит второй день", "protocols": ["Потеря слуха, вызванная шумом"], "sections": ["diagnostics", "treatment"], "kind": "in_domain" },
+    { "id": "h-adenoidy-1", "q": "как понять, что у ребёнка аденоиды: сопит и храпит", "protocols": ["Гипертрофия аденоидов"], "sections": ["diagnostics"], "kind": "in_domain" },
+    { "id": "h-adenoidy-2", "q": "аденоиды 3 степени — удалять или лечить", "protocols": ["Гипертрофия аденоидов"], "sections": ["treatment"], "kind": "in_domain" },
+    { "id": "h-tonzilly-1", "q": "частые ангины: когда убирать миндалины", "protocols": ["Хронический тонзиллит"], "sections": ["treatment"], "kind": "in_domain" },
+    { "id": "h-tonzilly-2", "q": "боль в горле и налёт на миндалинах, нужен ли антибиотик", "protocols": ["Острый тонзиллит и фарингит"], "sections": ["treatment", "diagnostics"], "kind": "in_domain" },
+    { "id": "h-laringit-1", "q": "голос пропал после простуды, что делать", "protocols": ["Острый ларингит"], "sections": ["treatment", "diagnostics"], "kind": "in_domain" },
+    { "id": "h-krup-1", "q": "ребёнок ночью закашлялся лающим кашлем и задыхается", "protocols": ["Острый обструктивный ларингит"], "sections": ["treatment", "diagnostics"], "kind": "in_domain" },
+    { "id": "h-sinusit-1", "q": "насморк больше недели, болит голова и щека", "protocols": ["Острый синусит"], "sections": ["diagnostics", "treatment"], "kind": "in_domain" },
+    { "id": "h-allerg-1", "q": "круглогодично заложен нос и зудит, чихаю", "protocols": ["Аллергический ринит"], "sections": ["treatment", "diagnostics"], "kind": "in_domain" },
+    { "id": "h-polip-1", "q": "носовые полипы и не чувствую запахи", "protocols": ["Полипозный риносинусит"], "sections": ["treatment", "diagnostics"], "kind": "in_domain" },
+    { "id": "h-pereg-1", "q": "искривлена перегородка, не дышу одной ноздрёй", "protocols": ["Деформация перегородки носа"], "sections": ["diagnostics", "treatment"], "kind": "in_domain" },
+    { "id": "h-travma-nosa-1", "q": "ударился носом, кровь не останавливается", "protocols": ["Травма носа"], "sections": ["diagnostics", "treatment"], "kind": "in_domain" },
+    { "id": "h-travma-uha-1", "q": "после удара по уху кровь из прохода и плохо слышу", "protocols": ["Травма уха"], "sections": ["diagnostics", "treatment"], "kind": "in_domain" },
+    { "id": "h-travma-gortani-1", "q": "осиплость после удара в шею", "protocols": ["Травма гортани"], "sections": ["diagnostics", "treatment"], "kind": "in_domain" },
+
+    { "id": "h-out-holesterol", "q": "как снизить холестерин без статинов", "protocols": [], "sections": [], "kind": "out_of_domain" },
+    { "id": "h-out-migren", "q": "мигрень: триптаны или НПВС", "protocols": [], "sections": [], "kind": "out_of_domain" },
+    { "id": "h-out-yazva", "q": "язвенная болезнь: схема эрадикации хеликобактера", "protocols": [], "sections": [], "kind": "out_of_domain" },
+    { "id": "h-out-artroz", "q": "боль в колене при артрозе, чем помочь", "protocols": [], "sections": [], "kind": "out_of_domain" },
+    { "id": "h-out-gipoteoz", "q": "гипотиреоз: когда назначать левотироксин", "protocols": [], "sections": [], "kind": "out_of_domain" }
+  ]
+}

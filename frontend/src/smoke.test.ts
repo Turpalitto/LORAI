@@ -7,5 +7,5 @@ describe('lorai smoke', () => {
     expect(humanError(new ApiError(401, 'Нужна авторизация.'))).toMatch(/авторизация/);
     expect(humanError(new TypeError('Failed to fetch'))).toMatch(/соединения/);
   });
-  it('version pinned', () => { expect(APP_VERSION).toBe('1.1.0'); });
+  it('version pinned', () => { expect(APP_VERSION).toBe('1.3.0'); });
 });

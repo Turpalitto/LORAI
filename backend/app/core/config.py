@@ -9,10 +9,26 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-4o-mini"
     LLM_BASE_URL: str = "https://api.openai.com/v1"
     LLM_THRESHOLD: float = 0.12
+    # Порог для эмбеддингов: у e5 своя шкала (0.84–0.91 даже на нерелевантном),
+    # домены разделяет не скор, а домен-гейт — см. docs/RETRIEVAL_EVAL.md
+    EMBEDDING_THRESHOLD: float = 0.75
     DATABASE_URL: str = f"sqlite:///{ROOT_DIR}/lorai.db"
     CHROMA_DIR: str = str(ROOT_DIR / "data" / "vector_store")
-    VECTOR_BACKEND: str = "tfidf"  # tfidf | chroma (см. DECISIONS #20)
+    VECTOR_BACKEND: str = "tfidf"  # tfidf | embeddings | chroma (DECISIONS #20, #26)
     EMBEDDING_MODEL: str = "intfloat/multilingual-e5-base"
+    # Кэш модели держим внутри проекта: стенд самодостаточен и не зависит от
+    # прав на ~/.cache (в песочнице запись туда запрещена).
+    EMBEDDING_CACHE_DIR: str = str(ROOT_DIR / "data" / "hf_cache")
+    # Во сколько раз приоритетнее чанк нужного раздела (лечение/диагностика).
+    # 1.0 — выключить маршрутизацию по разделам. Калибруется замером:
+    # scripts/eval_retrieval.py (см. docs/RETRIEVAL_EVAL.md).
+    SECTION_BOOST: float = 1.15
+    # Сколько обзорных (general) чанков допустимо в топ-k, когда вопрос про
+    # конкретный раздел: иначе дубли-обзоры вытесняют нужный раздел.
+    GENERAL_CHUNK_CAP: int = 2
+    # Вес лексической составляющей поверх эмбеддингов (калибруется замером):
+    # клинически соседние темы (острый/хронический отит) ловятся точным термином.
+    HYBRID_WEIGHT: float = 0.0
     JWT_SECRET: str = "change-me-in-production-please"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
