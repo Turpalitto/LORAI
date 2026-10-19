@@ -1,9 +1,14 @@
 from sqlalchemy import create_engine, select, func, desc, and_, or_
 from sqlalchemy.orm import Session
-from .models import Base, Document, QueryLog, Favorite, Feedback
+from .models import Base, Document, QueryLog, Favorite, Feedback, User, AuditLog
 from ..core.config import settings
+from ..core.migrations import ensure_schema
+from ..core.security import hash_pw
 eng = create_engine(settings.DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {})
-Base.metadata.create_all(eng)
+# Схему приводит к head alembic (см. core/migrations.py). create_all оставлен
+# только для тестов: иначе схема и миграции расходятся, и новая колонка
+# появляется лишь у того, кто вручную вспомнил про alembic.
+SCHEMA_STATE = ensure_schema()
 def save_document(doc: dict):
     with Session(eng) as s:
         d = Document(id=doc["document_id"], title=doc["title"], nosology=doc["nosology"],
@@ -14,9 +19,14 @@ def save_document(doc: dict):
             confidence=doc.get("extraction_confidence","medium"),
             needs_review=doc.get("needs_manual_review", False))
         s.merge(d); s.commit()
-def list_documents() -> list[dict]:
+def list_documents(include_processing: bool = False) -> list[dict]:
+    """Список документов. По умолчанию без тех, что ещё обрабатываются в фоне:
+    иначе врач видит в каталоге пустую карточку свежей загрузки."""
     with Session(eng) as s:
-        rows = s.execute(select(Document)).scalars().all()
+        stmt = select(Document)
+        if not include_processing:
+            stmt = stmt.where(Document.status != "processing")
+        rows = s.execute(stmt).scalars().all()
         return [{"document_id": r.id, "title": r.title, "nosology": r.nosology,
                  "icd10_codes": r.icd10_codes, "approval_year": r.approval_year,
                  "status": r.status, "confidence": r.confidence,
@@ -27,6 +37,8 @@ def get_document(doc_id: str) -> dict | None:
         if not r: return None
         return {"document_id": r.id, "title": r.title, "nosology": r.nosology,
                 "icd10_codes": r.icd10_codes, "approval_year": r.approval_year,
+                "status": r.status, "confidence": r.confidence,
+                "needs_review": r.needs_review,
                 "sections": r.data, "full_text": r.full_text}
 def update_document(doc_id: str, patch: dict) -> dict | None:
     with Session(eng) as s:
@@ -36,9 +48,12 @@ def update_document(doc_id: str, patch: dict) -> dict | None:
         if "icd10_codes" in patch: r.icd10_codes = patch["icd10_codes"]
         if "approval_year" in patch: r.approval_year = patch["approval_year"]
         if "needs_review" in patch: r.needs_review = patch["needs_review"]
+        if "status" in patch: r.status = patch["status"]
+        if "confidence" in patch: r.confidence = patch["confidence"]
         s.commit()
         return {"document_id": r.id, "title": r.title, "nosology": r.nosology,
                 "icd10_codes": r.icd10_codes, "approval_year": r.approval_year,
+                "status": r.status, "confidence": r.confidence,
                 "needs_review": r.needs_review}
 def search_protocols(q: str) -> list[dict]:
     """Поиск по документам. SQL-пушдаун: LIKE-фильтр по title/nosology/full_text
@@ -63,15 +78,26 @@ def search_protocols(q: str) -> list[dict]:
                  "icd10_codes": r.icd10_codes, "approval_year": r.approval_year,
                  "status": r.status, "confidence": r.confidence,
                  "needs_review": r.needs_review, "sections": r.data} for r in rows]
-def log_query(query: str, intent: str, refused: bool):
+def log_query(query: str, intent: str, refused: bool, user: str = "guest"):
     with Session(eng) as s:
-        s.add(QueryLog(query=query[:2000], intent=intent, refused=refused)); s.commit()
-def get_history(limit: int = 20) -> list[dict]:
-    from sqlalchemy import desc
+        s.add(QueryLog(query=query[:2000], intent=intent, refused=refused,
+                       user=(user or "guest")[:200]))
+        s.commit()
+
+
+def get_history(limit: int = 20, user: str | None = None) -> list[dict]:
+    """История запросов. `user` задан — только его записи; None — все (админ).
+
+    Раньше функция не знала про пользователя, и `/history` отдавал врачу
+    запросы всей клиники — с клиническим контекстом, но без имени автора.
+    """
     with Session(eng) as s:
-        rows = s.execute(select(QueryLog).order_by(desc(QueryLog.id)).limit(limit)).scalars().all()
+        stmt = select(QueryLog).order_by(desc(QueryLog.id)).limit(limit)
+        if user:
+            stmt = stmt.where(QueryLog.user == user)
+        rows = s.execute(stmt).scalars().all()
         return [{"query": r.query, "intent": r.intent, "refused": r.refused,
-                 "at": str(r.created_at)} for r in rows]
+                 "user": r.user, "at": str(r.created_at)} for r in rows]
 def add_favorite(user: str, doc_id: str, note: str = "") -> dict:
     with Session(eng) as s:
         f = Favorite(user=user, doc_id=doc_id, note=note); s.add(f); s.commit()
@@ -114,3 +140,194 @@ def usage_stats(gap_limit: int = 10) -> dict:
                 "refusal_rate": round(refused / total, 3) if total else 0.0,
                 "knowledge_gaps": [{"query": q, "count": n} for q, n in gaps],
                 "feedback": {"up": up, "down": down}}
+
+
+# --------------------------------------------------------------------------
+# Пользователи и аудит
+#
+# Раньше учётки жили в dict, собранном из env при старте: добавить врача —
+# правка .env + рестарт, сменить пароль — то же, истории действий нет вовсе.
+# Теперь БД — источник правды, env используется только для первичного сида.
+# --------------------------------------------------------------------------
+
+ROLES = ("admin", "doctor")
+
+
+def _norm_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def _user_row(r: User, with_hash: bool = False) -> dict:
+    out = {"email": r.email, "role": r.role, "active": bool(r.active),
+           "full_name": r.full_name or "",
+           "created_at": str(r.created_at) if r.created_at else None,
+           "last_login_at": str(r.last_login_at) if r.last_login_at else None}
+    if with_hash:
+        out["pw_hash"] = r.pw_hash
+    return out
+
+
+def get_user(email: str) -> dict | None:
+    """Учётка по email (включая хеш пароля — нужен только login)."""
+    with Session(eng) as s:
+        r = s.get(User, _norm_email(email))
+        return _user_row(r, with_hash=True) if r else None
+
+
+def list_users() -> list[dict]:
+    """Все учётки без хешей паролей — для админки."""
+    with Session(eng) as s:
+        rows = s.execute(select(User).order_by(User.email)).scalars().all()
+        return [_user_row(r) for r in rows]
+
+
+def create_user(email: str, password: str, role: str = "doctor",
+                full_name: str = "") -> dict:
+    email = _norm_email(email)
+    if not email or "@" not in email:
+        raise ValueError("Некорректный email")
+    if role not in ROLES:
+        raise ValueError("Роль должна быть admin или doctor")
+    if len(password or "") < 8:
+        raise ValueError("Пароль короче 8 символов")
+    with Session(eng) as s:
+        if s.get(User, email):
+            raise ValueError("Пользователь с таким email уже существует")
+        u = User(email=email, pw_hash=hash_pw(password), role=role,
+                 full_name=full_name[:200])
+        s.add(u); s.commit()
+        return _user_row(u)
+
+
+def update_user(email: str, patch: dict) -> dict | None:
+    """Правка учётки: роль, активность, ФИО, пароль.
+
+    Пароль приходит открытым текстом и хешируется здесь же — наружу хеш
+    не отдаётся никогда.
+    """
+    email = _norm_email(email)
+    with Session(eng) as s:
+        u = s.get(User, email)
+        if not u:
+            return None
+        if "role" in patch and patch["role"] is not None:
+            if patch["role"] not in ROLES:
+                raise ValueError("Роль должна быть admin или doctor")
+            u.role = patch["role"]
+        if "active" in patch and patch["active"] is not None:
+            u.active = bool(patch["active"])
+        if "full_name" in patch and patch["full_name"] is not None:
+            u.full_name = str(patch["full_name"])[:200]
+        if patch.get("password"):
+            if len(patch["password"]) < 8:
+                raise ValueError("Пароль короче 8 символов")
+            u.pw_hash = hash_pw(patch["password"])
+        s.commit()
+        return _user_row(u)
+
+
+def count_active_admins() -> int:
+    with Session(eng) as s:
+        return s.execute(
+            select(func.count(User.email)).where(User.role == "admin",
+                                                  User.active.is_(True))
+        ).scalar() or 0
+
+
+def touch_login(email: str) -> None:
+    from datetime import datetime as _dt
+    with Session(eng) as s:
+        u = s.get(User, _norm_email(email))
+        if u:
+            u.last_login_at = _dt.utcnow(); s.commit()
+
+
+def ensure_default_users() -> int:
+    """Идемпотентный сид из env: создаёт недостающие учётки, существующие не
+    трогает (иначе смена пароля в админке откатывалась бы при рестарте).
+
+    Вызывается при импорте `app.main` — на пустой БД это первый админ.
+    """
+    defaults = [{"email": settings.ADMIN_EMAIL, "password": settings.ADMIN_PASSWORD,
+                 "role": "admin", "full_name": "Администратор"}]
+    if settings.LORAI_DOCTOR_EMAIL and settings.LORAI_DOCTOR_PASSWORD:
+        defaults.append({"email": settings.LORAI_DOCTOR_EMAIL,
+                         "password": settings.LORAI_DOCTOR_PASSWORD,
+                         "role": "doctor", "full_name": ""})
+    created = 0
+    with Session(eng) as s:
+        for d in defaults:
+            email = _norm_email(d["email"])
+            if not email or s.get(User, email):
+                continue
+            s.add(User(email=email, pw_hash=hash_pw(d["password"]),
+                       role=d["role"], full_name=d.get("full_name", "")))
+            created += 1
+        if created:
+            s.commit()
+    return created
+
+
+def audit(user: str, action: str, target: str = "", detail: str = "",
+          ip: str = "") -> None:
+    """Запись в журнал действий. Ошибка журнала не должна ломать действие."""
+    try:
+        with Session(eng) as s:
+            s.add(AuditLog(user=(user or "guest")[:200], action=action[:100],
+                           target=(target or "")[:300], detail=(detail or "")[:1000],
+                           ip=(ip or "")[:64]))
+            s.commit()
+    except Exception:
+        pass
+
+
+def list_audit(limit: int = 100, action: str | None = None,
+               user: str | None = None) -> list[dict]:
+    with Session(eng) as s:
+        stmt = select(AuditLog).order_by(desc(AuditLog.id)).limit(max(1, min(limit, 1000)))
+        if action:
+            stmt = stmt.where(AuditLog.action == action)
+        if user:
+            stmt = stmt.where(AuditLog.user == _norm_email(user))
+        rows = s.execute(stmt).scalars().all()
+        return [{"id": r.id, "user": r.user, "action": r.action, "target": r.target,
+                 "detail": r.detail, "ip": r.ip,
+                 "at": str(r.created_at)} for r in rows]
+
+
+def purge_old_queries(days: int) -> int:
+    """Политика хранения: тексты запросов старше N дней удаляются.
+
+    ПДн-фильтр на входе не абсолютен, а клинический текст в БД бессрочно —
+    это лишний риск. Аналитика (refused/intent) старше срока тоже не нужна.
+    """
+    from datetime import datetime as _dt, timedelta as _td
+    if days <= 0:
+        return 0
+    cutoff = _dt.utcnow() - _td(days=days)
+    with Session(eng) as s:
+        rows = s.execute(select(QueryLog).where(QueryLog.created_at < cutoff)).scalars().all()
+        for r in rows:
+            s.delete(r)
+        s.commit()
+        return len(rows)
+
+
+def purge_old_audit(days: int) -> int:
+    from datetime import datetime as _dt, timedelta as _td
+    if days <= 0:
+        return 0
+    cutoff = _dt.utcnow() - _td(days=days)
+    with Session(eng) as s:
+        rows = s.execute(select(AuditLog).where(AuditLog.created_at < cutoff)).scalars().all()
+        for r in rows:
+            s.delete(r)
+        s.commit()
+        return len(rows)
+
+
+# Первичный сид учёток. Делается при импорте репозитория, а не только в
+# app.main: иначе скрипты и тесты, работающие с БД напрямую, видели пустую
+# таблицу пользователей. Существующие записи не трогаются.
+DEFAULT_USERS_CREATED = ensure_default_users()
+

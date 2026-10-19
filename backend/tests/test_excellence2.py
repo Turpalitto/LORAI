@@ -51,8 +51,9 @@ def test_chat_cache_only_without_session():
 
 
 def test_health_detail():
+    """Детали доступны только админу; публичный /health отдаёт лишь статус."""
     c = _client()
-    h = c.get("/health").json()
+    h = c.get("/admin/health", headers=_auth(c)).json()
     assert h["ok"] is True
     for k in ("db", "documents", "vector_store", "chunks",
               "llm_configured", "llm_mode", "cache", "avg_latency_ms"):

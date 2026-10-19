@@ -7,10 +7,19 @@ from .anti_hallucination import should_refuse, check_numbers, effective_threshol
 from .clarify import clarifying_question
 from .sessions import expand_query, remember, new_session_id
 from ..llm_clients.mock import MockLLMClient
+import threading
 _vs = None
+_vs_lock = threading.Lock()
+
+
 def vs() -> VectorStore:
+    """Ленивый синглтон стора. Под замком: два одновременных первых запроса
+    иначе грузили модель дважды (память ×2, старт ×2)."""
     global _vs
-    if _vs is None: _vs = VectorStore(settings.CHROMA_DIR)
+    if _vs is None:
+        with _vs_lock:
+            if _vs is None:
+                _vs = VectorStore(settings.CHROMA_DIR)
     return _vs
 
 
@@ -27,9 +36,9 @@ def _source_map(chunks: list[dict]) -> dict:
 
 
 def answer(query: str, k: int = 6, filters: dict | None = None,
-           session_id: str | None = None) -> dict:
+           session_id: str | None = None, user: str = "guest") -> dict:
     from ..llm_clients.mock import get_client
-    pre = _prepare(query, k=k, filters=filters, session_id=session_id)
+    pre = _prepare(query, k=k, filters=filters, session_id=session_id, user=user)
     if pre["kind"] != "ready":
         return pre["result"]
     sys, usr, chunks, smap, top, intent, sid = (pre["sys"], pre["usr"], pre["chunks"],
@@ -37,20 +46,20 @@ def answer(query: str, k: int = 6, filters: dict | None = None,
     raw = get_client().complete(sys, usr)
     final = check_numbers(raw, chunks)
     remember(sid, query)
-    repo.log_query(query, intent, False)
+    repo.log_query(query, intent, False, user=user)
     return {"answer": final, "refused": False, "intent": intent,
             "top_score": top, "sources": chunks,
             "source_map": smap, "doc_count": len(smap), "session_id": sid}
 
 
 def _prepare(query: str, k: int = 6, filters: dict | None = None,
-             session_id: str | None = None) -> dict:
+             session_id: str | None = None, user: str = "guest") -> dict:
     """Общая pre-стадия answer/answer_stream: гейт отказа и уточнений.
     kind: refused | clarify | ready. Для ready — всё для генерации."""
     sid = session_id or new_session_id()
     intent = classify_intent(query or "")
     if not (query or "").strip():
-        repo.log_query(query or "", intent, True)
+        repo.log_query(query or "", intent, True, user=user)
         return {"kind": "refused", "result": {
             "answer": REFUSAL, "refused": True, "intent": intent,
             "top_score": 0.0, "sources": [], "session_id": sid}}
@@ -62,7 +71,7 @@ def _prepare(query: str, k: int = 6, filters: dict | None = None,
     smap = _source_map(chunks)
     if should_refuse(chunks, effective_threshold(vs().backend), eff):
         remember(sid, query)
-        repo.log_query(query, intent, True)
+        repo.log_query(query, intent, True, user=user)
         return {"kind": "refused", "result": {
             "answer": REFUSAL, "refused": True, "intent": intent,
             "top_score": top, "sources": chunks,
@@ -70,7 +79,7 @@ def _prepare(query: str, k: int = 6, filters: dict | None = None,
     cq = clarifying_question(query)
     if cq:
         remember(sid, query)
-        repo.log_query(query, "needs_clarification", False)
+        repo.log_query(query, "needs_clarification", False, user=user)
         return {"kind": "clarify", "result": {
             "answer": None, "refused": False, "intent": "needs_clarification",
             "top_score": top, "sources": chunks,
@@ -82,14 +91,14 @@ def _prepare(query: str, k: int = 6, filters: dict | None = None,
 
 
 def answer_stream(query: str, k: int = 6, filters: dict | None = None,
-                  session_id: str | None = None):
+                  session_id: str | None = None, user: str = "guest"):
     """Генератор SSE-событий: meta → token* → [corrected?] → done.
     С живым провайдером токены идут от LLM по мере генерации; с mock —
     нарезка готового ответа (транспортный фолбэк, фронт не меняется).
     check_numbers применяется к полному тексту; при правке цифр фронт
     получает событие corrected и заменяет ответ целиком."""
     from ..llm_clients.mock import get_client
-    pre = _prepare(query, k=k, filters=filters, session_id=session_id)
+    pre = _prepare(query, k=k, filters=filters, session_id=session_id, user=user)
     if pre["kind"] != "ready":
         r = pre["result"]
         yield {"type": "meta", **{key: r.get(key) for key in (
@@ -118,7 +127,7 @@ def answer_stream(query: str, k: int = 6, filters: dict | None = None,
             yield {"type": "token", "text": piece}
     final = check_numbers(full, chunks)
     remember(sid, query)
-    repo.log_query(query, intent, False)
+    repo.log_query(query, intent, False, user=user)
     if final != full:
         yield {"type": "corrected", "text": final}
     yield {"type": "done", "answer": final}

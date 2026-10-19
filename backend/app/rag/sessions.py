@@ -28,11 +28,27 @@ def _now() -> float:
     return time.time()
 
 
+# Порог, после которого подчищаем просроченные сессии. Раньше они удалялись
+# только при повторном обращении к тому же sid: за сутки работы в словаре
+# накапливались тысячи мёртвых записей.
+_PRUNE_AT = 500
+
+
+def _prune(now: float | None = None) -> int:
+    now = _now() if now is None else now
+    dead = [k for k, v in _SESSIONS.items() if now - v["t"] > _TTL_SEC]
+    for k in dead:
+        _SESSIONS.pop(k, None)
+    return len(dead)
+
+
 def _get(sid: str) -> dict:
     s = _SESSIONS.get(sid)
     if not s or _now() - s["t"] > _TTL_SEC:
         s = {"t": _now(), "turns": []}
         _SESSIONS[sid] = s
+        if len(_SESSIONS) > _PRUNE_AT:
+            _prune()
     return s
 
 

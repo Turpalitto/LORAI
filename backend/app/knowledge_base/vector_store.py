@@ -12,10 +12,34 @@
 Если выбранные embeddings недоступны (нет пакета/модели), стор честно
 откатывается на TF-IDF и сообщает причину в backend_note — молчаливой деградации нет.
 """
-import os, pickle, math, re
+import os, pickle, math, re, uuid
 from collections import Counter
 
 import numpy as np
+
+from ..core.logging import log
+
+
+def _atomic_pickle(path: str, obj) -> None:
+    """Запись через уникальный temp + os.replace.
+
+    Уникальное имя обязательно: с общим `<path>.tmp` два параллельных
+    сохранения (например, две загрузки в фоновых задачах) затирали файл друг
+    друга, и одно падало с ENOENT на rename — индекс при этом терял изменения.
+    """
+    tmp = f"{path}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+    try:
+        with open(tmp, "wb") as fh:
+            pickle.dump(obj, fh)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    finally:
+        try:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+        except OSError:
+            pass
 
 
 def _tok(s: str) -> list[str]:
@@ -154,8 +178,8 @@ class VectorStore:
                         and len(blob.get("vectors", [])) == len(self.docs)):
                     self._vectors = np.asarray(blob["vectors"], dtype=np.float32)
                     return
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning("индекс векторов не прочитан (%s) — пересобираю", e)
         self._vectors = self._encode([d["text"] for d in self.docs], passage=True) if self.docs else None
         self._save_vectors()
 
@@ -166,13 +190,14 @@ class VectorStore:
         if self._vectors is None:
             return
         try:
-            pickle.dump({"model": self.model_name, "vectors": self._vectors},
-                        open(self._vec_path(), "wb"))
+            _atomic_pickle(self._vec_path(), {"model": self.model_name, "vectors": self._vectors})
             import json as _json
-            _json.dump({"model": self.model_name, "count": int(len(self._vectors))},
-                       open(self._vec_meta_path(), "w", encoding="utf-8"))
-        except Exception:
-            pass
+            tmp = self._vec_meta_path() + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                _json.dump({"model": self.model_name, "count": int(len(self._vectors))}, fh)
+            os.replace(tmp, self._vec_meta_path())
+        except Exception as e:
+            log.warning("не удалось сохранить индекс векторов: %s", e)
 
     # ---------- загрузка/сохранение ----------
     def _load(self):
@@ -184,7 +209,10 @@ class VectorStore:
 
     def _save(self):
         if self.chroma is None:
-            pickle.dump(self.docs, open(os.path.join(self.dir, "fallback.pkl"), "wb"))
+            try:
+                _atomic_pickle(os.path.join(self.dir, "fallback.pkl"), self.docs)
+            except Exception as e:
+                log.warning("не удалось сохранить текстовый индекс: %s", e)
 
     # ---------- запись ----------
     def add(self, chunks: list[dict], doc_meta: dict):

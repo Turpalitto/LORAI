@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     LORAI_DOCTOR_PASSWORD: str = ""
     # CORS allowlist web-клиентов (native-клиенты без Origin не затрагиваются)
     LORAI_ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+    # Политика хранения. Тексты клинических запросов в БД бессрочно — лишний
+    # риск: ПДн-фильтр на входе не абсолютен. 0 — не чистить (не рекоменуется).
+    QUERY_RETENTION_DAYS: int = 90
+    AUDIT_RETENTION_DAYS: int = 365
+    APP_VERSION: str = "1.4.0"
     class Config:
         env_file = ".env"
         extra = "ignore"

@@ -61,9 +61,9 @@ def test_upload_pdf_alias_and_dedup():
     import time
     fname = f"dedup_audit_{int(time.time()*1000)}.txt"
     r1 = c.post("/admin/upload-pdf", headers=h, files={"f": (fname, blob, "text/plain")})
-    assert r1.status_code == 200
+    assert r1.status_code == 202, r1.text
     r2 = c.post("/admin/upload-pdf", headers=h, files={"f": (fname, blob, "text/plain")})
-    assert r2.status_code == 200
+    assert r2.status_code == 202
     assert r1.json()["document_id"] == r2.json()["document_id"]
     assert r2.json()["duplicate"] is True
     n1 = len(c.get("/admin/documents", headers=h).json()["items"])
@@ -78,11 +78,14 @@ def test_upload_returns_lifecycle_fields_and_searchable():
     fname = f"lifecycle_{int(time.time()*1000)}.txt"
     blob = "Определение\nФарингит J02.9\nДиагностика\nФарингоскопия\nЛечение\nПолоскание\n".encode("utf-8")
     r = c.post("/admin/upload", headers=h, files={"f": (fname, blob, "text/plain")})
-    assert r.status_code == 200
+    assert r.status_code == 202, r.text
     j = r.json()
-    assert j["processing_status"] == "processed"
-    assert j["confidence"] in ("high", "medium", "low")
-    assert "needs_review" in j and "document_id" in j
+    assert j["status"] == "processing" and "document_id" in j
+    # разбор идёт в фоне — ждём готовности через тот же эндпоинт, что и админка
+    doc = c.get(f"/protocols/{j['document_id']}").json()
+    assert doc["status"] == "processed"
+    assert doc["confidence"] in ("high", "medium", "low")
+    assert "needs_review" in doc
     items = c.post("/search-protocol", json={"q": "J02"}).json()["items"]
     assert any(i["document_id"] == j["document_id"] for i in items)
 def test_upload_broken_pdf_rejected_cleanly():
@@ -90,8 +93,8 @@ def test_upload_broken_pdf_rejected_cleanly():
     tok = c.post("/auth/login", json={"email": "admin@lorai.local", "password": "admin123"}).json()["token"]
     r = c.post("/admin/upload-pdf", headers={"Authorization": "Bearer " + tok},
                files={"f": ("broken.pdf", b"%PDF-1.4 \x00 broken binary \xff\xfe", "application/pdf")})
-    # либо чистая 400, либо needs_review — но не 500
-    assert r.status_code in (200, 400)
+    # либо чистая 400, либо принято в обработку с needs_review — но не 500
+    assert r.status_code in (202, 400)
 def test_dosage_pediatric_and_cap():
     c = _client()
     r = c.post("/dosage", json={"weight_kg": 12, "mg_per_kg": 40})

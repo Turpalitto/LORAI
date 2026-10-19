@@ -154,7 +154,22 @@ def build_index_chunks(pages: list[dict]) -> list[dict]:
             chunks.append({**ch, "page_range": seg["pages"][:10] or [1]})
     return chunks
 
-def process_pdf(path: str, llm_client=None, title: str | None = None) -> dict:
+def _section_text(chunks: list[dict], name: str, cap: int = 20000) -> str:
+    """Текст раздела из чанков — тот же, что уходит в поисковый индекс.
+    Раньше разделы собирались отдельной эвристикой (`detect_sections`) и
+    обрезались до 6000 символов: чек-лист и поиск видели разный текст."""
+    parts = [c.get("text", "") for c in chunks if c.get("section") == name]
+    return "\n".join(parts)[:cap]
+
+
+def process_pdf(path: str, llm_client=None, title: str | None = None,
+                document_id: str | None = None) -> dict:
+    """Разбор PDF/TXT в документ + чанки.
+
+    `document_id` задаётся снаружи при фоновой обработке: запись создаётся
+    заранее (status=processing), чтобы клиент мог опрашивать статус, а
+    результат лёг в ту же строку.
+    """
     import os
     pages = load_pages(path)
     secs = detect_sections(pages)
@@ -167,7 +182,20 @@ def process_pdf(path: str, llm_client=None, title: str | None = None) -> dict:
         try: llm_part = structure_with_llm(full[:8000], llm_client)
         except Exception: pass
     year_m = re.search(r"(19|20)\d{2}", os.path.basename(path))
-    found = secs.get("sections_found", [])
+
+    # Чанки — тем же чанкером, что и офлайн-пересборка корпуса (1.3.0).
+    # Раньше загрузка через админку шла старым путём: разделы обрезались до
+    # 6000 символов, а «общие» чанки дублировали весь документ (замер на КР
+    # «Аллергический ринит»: 88 % чанков — general против 2 % у нового чанкера).
+    # Новый документ, загруженный врачом, попадал в индекс в худшем виде, чем
+    # тот же документ после scripts/reindex_corpus.py.
+    chunks = build_index_chunks(pages)
+    if not chunks and full.strip():
+        # короткий/нестандартный документ: не теряем текст совсем
+        chunks = chunk_text(full, {"section": "general",
+                                   "page_range": sorted({p["page"] for p in pages})[:10] or [1]})
+    found = sorted({c.get("section", "") for c in chunks if c.get("section") not in ("", "general")})
+
     # Тихо терять данные запрещено: если секции не распознались (нестандартные
     # заголовки) или нет кодов МКБ — документ уходит на ручную проверку.
     needs_review = not bool(icd and full.strip()) or len(found) < 2
@@ -177,7 +205,7 @@ def process_pdf(path: str, llm_client=None, title: str | None = None) -> dict:
     if not full.strip():
         conf, needs_review = "low", True
     doc = {
-        "document_id": str(uuid.uuid4()),
+        "document_id": document_id or str(uuid.uuid4()),
         "title": title or os.path.basename(path)[:200],
         "nosology": (title or os.path.basename(path).split("_")[0].split(".")[0])[:200],
         "icd10_codes": icd,
@@ -186,32 +214,26 @@ def process_pdf(path: str, llm_client=None, title: str | None = None) -> dict:
         "source_file": os.path.basename(path),
         "processing_status": "processed" if full.strip() else "failed",
         "sections": {
-            "definition": llm_part.get("definition") or secs.get("definition", ""),
+            "definition": llm_part.get("definition") or _section_text(chunks, "definition"),
             "etiology_epidemiology": str(llm_part.get("etiology_epidemiology") or ""),
             "classification": str(llm_part.get("classification") or ""),
             "diagnostics": {"complaints": [], "anamnesis": [], "physical_exam": [],
                             "lab_tests": [], "instrumental_tests": [],
-                            "differential_diagnosis": [], "raw": secs.get("diagnostics", "")},
+                            "differential_diagnosis": [],
+                            "raw": _section_text(chunks, "diagnostics")},
             "treatment": {"conservative": tables[:20], "surgical": [],
                           "indications_for_hospitalization": [],
-                          "raw": secs.get("treatment", "")},
-            "complications": [], "prevention": [], "prognosis": [],
-            "referral_criteria": [], "follow_up": [],
+                          "raw": _section_text(chunks, "treatment")},
+            "complications": _section_text(chunks, "complications"),
+            "prevention": _section_text(chunks, "prevention"),
+            "prognosis": [],
+            "referral_criteria": _section_text(chunks, "referral_criteria"),
+            "follow_up": [],
         },
         "source_pages": secs.get("source_pages", {}),
         "extraction_confidence": conf,
         "needs_manual_review": needs_review,
     }
-    # чанки для RAG
-    chunks = []
-    for sec_name in ("definition", "diagnostics", "treatment"):
-        t = secs.get(sec_name, "")
-        if isinstance(t, dict): t = t.get("raw", "")
-        chunks += chunk_text(str(t), {"section": sec_name,
-            "page_range": doc["source_pages"].get(sec_name, [1])})
-    # плюс общие чанки ПО ВСЕМУ документу (дозы/факты в конце не должны теряться)
-    chunks += chunk_text(full, {"section": "general", "page_range": sorted(
-        {p["page"] for p in pages})[:10] or [1]})
     doc["_chunks"] = chunks
     doc["_full_text"] = full[:60000]
     return doc

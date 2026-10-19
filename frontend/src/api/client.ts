@@ -1,5 +1,5 @@
 export const API = (import.meta as any).env.VITE_API_URL || 'http://localhost:8000';
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 export const DISC =
   'Справочный инструмент для врача. Решение принимает врач. Не вводите персональные данные пациента (ФИО, телефон, паспорт, СНИЛС).';
 

@@ -1,9 +1,25 @@
 import re
 REFUSAL = "В загруженных клинических рекомендациях информация по этому вопросу не найдена."
+
+# Число как отдельный токен: «5» и «500» — разные числа. Прежняя проверка
+# искала подстроку в тексте контекста, поэтому «5 мг» проходило, если в
+# источнике было «500 мг» (ошибка в 100 раз в сторону недодозы — молча).
+# Границы (?<![\d.,]) / (?![\d.,]) не дают числу совпасть с частью другого.
+_NUM_RX = re.compile(r"(?<![\d.,])\d+(?:[.,]\d+)?(?![\d.,])")
+# «1 000 мг» / «1 500» — разрядные пробелы внутри числа склеиваем
+_THOUSANDS_RX = re.compile(r"(?<=\d)[\s\u00a0](?=\d{3}(?!\d))")
+
+
+def _numbers(text: str) -> set[str]:
+    flat = _THOUSANDS_RX.sub("", text or "")
+    return {m.group(0).replace(",", ".") for m in _NUM_RX.finditer(flat)}
+
+
 def check_numbers(answer: str, chunks: list[dict]) -> str:
-    nums = set(re.findall(r"\d+(?:[.,]\d+)?\s*(?:мг|мл|г|мкг|МЕ|%)?", answer))
-    ctx = " ".join(c.get("text","") for c in chunks)
-    bad = [n for n in nums if n.strip() and n.strip().split()[0] not in ctx]
+    nums = _numbers(answer)
+    ctx = " ".join(c.get("text", "") for c in chunks)
+    ctx_nums = _numbers(ctx)
+    bad = sorted(n for n in nums if n not in ctx_nums)
     if bad:
         return answer + "\n\n⚠️ Числа требуют проверки врачом: " + ", ".join(bad[:5])
     return answer

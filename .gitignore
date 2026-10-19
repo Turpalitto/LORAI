@@ -20,3 +20,6 @@ data/hf_cache/
 frontend/test-results/
 playwright-report/
 lorai-home.png
+.pytest_tmp/
+lorai.db.bak-*
+.workbuddy-ai/

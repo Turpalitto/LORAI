@@ -48,13 +48,17 @@ def test_jwt_custom_secret_works():
 
 # --- SEC-3: doctor-аккаунт создаётся только из settings ---
 def test_doctor_account_env_driven_via_settings():
-    """env-переменные читаются через Settings (работает и .env-файл, и os.environ)."""
-    import app.main as m
+    """env-переменные читаются через Settings (работает и .env-файл, и os.environ).
+
+    С 1.4.0 учётки живут в таблице `users`, env — только первичный сид.
+    """
     from app.core.config import settings
+    from app.knowledge_base import repository as repo
     if settings.LORAI_DOCTOR_EMAIL and settings.LORAI_DOCTOR_PASSWORD:
-        assert settings.LORAI_DOCTOR_EMAIL in m.USERS
+        u = repo.get_user(settings.LORAI_DOCTOR_EMAIL)
+        assert u and u["role"] == "doctor", "doctor из env должен быть в БД"
     else:
-        assert not any(u["role"] == "doctor" for u in m.USERS.values())
+        assert not any(u["role"] == "doctor" for u in repo.list_users())
 
 
 def test_no_builtin_doctor_account():
@@ -102,7 +106,8 @@ def test_upload_invalidates_cache():
             "Диагностика\nОсмотр.\nЛечение\nНаблюдение.\n").encode("utf-8")
     up = c.post("/admin/upload-pdf", headers=h,
                 files={"f": ("cache-inv-test5.txt", blob, "text/plain")})
-    assert up.status_code == 200, up.text
+    # разбор идёт в фоне (202), TestClient дожидается background-задачи до возврата
+    assert up.status_code == 202, up.text
     r3 = c.post("/search-protocol", json=q).json()
     assert r3["cached"] is False, "кэш не инвалидирован после upload"
     assert len(r3["items"]) == 1, "новый документ не находится после инвалидации"

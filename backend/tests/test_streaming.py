@@ -29,8 +29,10 @@ def _events(text: str) -> list[dict]:
     return [json.loads(line[6:]) for line in text.splitlines() if line.startswith("data: ")]
 
 
-def _slow_stream(query, k=6, filters=None, session_id=None):
-    """meta уходит сразу, token/done — после паузы: эмулирует медленную LLM."""
+def _slow_stream(query, k=6, filters=None, session_id=None, **kwargs):
+    """meta уходит сразу, token/done — после паузы: эмулирует медленную LLM.
+    **kwargs — чтобы дубль не падал, когда у answer_stream появляется новый
+    параметр (например, user для истории запросов)."""
     yield {"type": "meta", "refused": False, "intent": "test", "sources": [], "session_id": "s"}
     time.sleep(0.6)
     yield {"type": "token", "text": "ответ"}
