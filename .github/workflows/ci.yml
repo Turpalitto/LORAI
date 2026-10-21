@@ -19,15 +19,62 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Версия Node из .nvmrc, а не «20 по памяти»: расхождение с локальной
+          # сборкой давало падения rollup на нативном бинарнике.
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
       - run: npx tsc --noEmit
         working-directory: frontend
+      # vitest раньше не запускался в CI вообще: юнит-тесты фронтенда жили
+      # только на машине разработчика.
+      - run: npx vitest run
+        working-directory: frontend
       - run: npm run build
         working-directory: frontend
+  eval:
+    # Гейт качества поиска. Проверяем инварианты, а не абсолютный recall:
+    # абсолютные цифры зависят от версии модели эмбеддингов и «плывут» между
+    # релизами, а ложные отказы и пропуск вне-доменных — это безопасность.
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r backend/requirements.txt
+      - name: Поисковый индекс из корпуса
+        run: |
+          python scripts/reindex_corpus.py
+          python scripts/reindex_embeddings.py --force
+      - name: Hold-out замер
+        run: |
+          RERANK_BACKEND=off VECTOR_BACKEND=embeddings python scripts/eval_retrieval.py \
+            --holdout --k 6 --general-cap 2 --json eval_holdout.json
+      - name: Инварианты качества
+        run: |
+          python - <<'PY'
+          import json, sys
+          s = json.load(open("eval_holdout.json"))["summary"]
+          print({k: s[k] for k in ("recall_at_k", "protocol_and_section_at_k",
+                                    "false_refusal_rate", "out_refusal_rate")})
+          bad = []
+          if s["false_refusal_rate"] > 0:
+              bad.append("ложные отказы на in-domain вопросах")
+          if s["out_refusal_rate"] < 1.0:
+              bad.append("вне-доменный вопрос не отсечён")
+          if s["recall_at_k"] < 0.85:
+              bad.append("recall@6 ниже 0.85")
+          sys.exit("; ".join(bad) if bad else 0)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-holdout
+          path: eval_holdout.json
   e2e:
     runs-on: ubuntu-latest
     steps:
@@ -37,7 +84,7 @@ jobs:
           python-version: "3.11"
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: pip install -r backend/requirements.txt

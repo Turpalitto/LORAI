@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { api, apiStream, ApiError } from './client';
+import { api, apiStream, ApiError, apiBase } from './client';
 
 /* Тесты работают на подменённом fetch: реальная сеть не нужна.
    Главный кейс — регресс: кнопка «Остановить» должна обрывать тело ответа
@@ -134,5 +134,24 @@ describe('версия API', () => {
     await apiStream('/chat/stream', { query: 'x' }, () => {});
     expect(urls.length).toBe(3);
     for (const u of urls) expect(u).toMatch(/\/v1\//);
+  });
+});
+
+/* Docker-образ собирается с VITE_API_URL="" — это «тот же origin», который
+   проксирует nginx. Пока стояло `|| 'http://localhost:8000'`, пустая строка
+   превращалась в localhost и контейнерный фронтенд не доходил до API.
+   Проверяем чистую функцию: import.meta.env в Vite инлайнится на сборке и
+   в тесте не подменяется. */
+describe('база API', () => {
+  it('пустой VITE_API_URL означает тот же origin', () => {
+    expect(apiBase('')).toBe('');
+  });
+
+  it('незаданный VITE_API_URL — локальный backend', () => {
+    expect(apiBase(undefined)).toBe('http://localhost:8000');
+  });
+
+  it('заданный VITE_API_URL используется как есть', () => {
+    expect(apiBase('https://lorai.example')).toBe('https://lorai.example');
   });
 });

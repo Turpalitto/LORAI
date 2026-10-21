@@ -1,8 +1,17 @@
-export const API = (import.meta as any).env.VITE_API_URL || 'http://localhost:8000';
+/* База API. Пустая строка — осознанное значение: «тот же origin», который
+   проксирует nginx в docker-образе. Прежняя запись `|| 'http://localhost:8000'`
+   превращала пустую строку в localhost, и контейнерный фронтенд не мог
+   достучаться до backend через прокси. */
+export function apiBase(envValue?: string | null): string {
+  // undefined = переменная не задана (dev-режим) → локальный backend.
+  // Пустая строка — задана и означает «тот же origin» (docker + nginx).
+  return envValue === undefined || envValue === null ? 'http://localhost:8000' : envValue;
+}
+export const API = apiBase((import.meta as any).env.VITE_API_URL);
 /* Версия контракта: канонические пути живут под /v1 (backend монтирует роутеры
    дважды — /v1 и legacy без префикса, который помечен Deprecation). */
 export const API_PREFIX = '/v1';
-export const APP_VERSION = '1.7.2';
+export const APP_VERSION = '1.8.0';
 export const DISC =
   'Справочный инструмент для врача. Решение принимает врач. Не вводите персональные данные пациента (ФИО, телефон, паспорт, СНИЛС).';
 

@@ -7,8 +7,15 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-lorai}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Порт наружу не публикуем: база нужна только backend'у. Публикация 5432
+    # с дефолтным паролем lorai — открытая база в локальной сети клиники.
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lorai} -d ${POSTGRES_DB:-lorai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
   backend:
     build: ./backend
     env_file: .env
@@ -19,13 +26,30 @@ services:
       - ./data:/app/data
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    # Ждём готовности БД, а не просто старта контейнера: иначе миграции
+    # падают на «connection refused» при холодном старте.
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # curl в python:slim нет — проверяем стандартной библиотекой.
+      test: ["CMD", "python", "-c",
+             "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=5).status==200 else 1)"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      # Первый ответ прогревает модель эмбеддингов — до минуты.
+      start_period: 90s
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Пустая строка = same-origin, запросы идут через nginx-прокси /v1.
+        VITE_API_URL: ""
     ports:
       - "${FRONTEND_PORT:-5173}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 volumes:
   pgdata:
