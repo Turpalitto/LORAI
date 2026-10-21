@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     AUDIT_RETENTION_DAYS: int = 365
     # Формат логов: text (человеку) | json (Loki/ELK: одна строка — одна запись).
     LOG_FORMAT: str = "text"
-    APP_VERSION: str = "1.6.0"
+    APP_VERSION: str = "1.7.0"
     class Config:
         env_file = ".env"
         extra = "ignore"

@@ -2,7 +2,7 @@ export const API = (import.meta as any).env.VITE_API_URL || 'http://localhost:80
 /* Версия контракта: канонические пути живут под /v1 (backend монтирует роутеры
    дважды — /v1 и legacy без префикса, который помечен Deprecation). */
 export const API_PREFIX = '/v1';
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.7.0';
 export const DISC =
   'Справочный инструмент для врача. Решение принимает врач. Не вводите персональные данные пациента (ФИО, телефон, паспорт, СНИЛС).';
 

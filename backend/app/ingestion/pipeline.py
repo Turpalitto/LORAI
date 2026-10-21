@@ -107,6 +107,38 @@ def _section_of_line(line: str) -> str | None:
     return None
 
 
+# Заголовок, подтверждённый ВЁРСТКОЙ (крупный кегль, см. pdf_loader._page_headings),
+# можно трактовать мягче: не «строка целиком равна названию главы», а «в коротком
+# заголовке есть ключевое слово». Именно так терялись «Медицинская реабилитация»,
+# «Клиническая картина», «Cимптомы, течение» — они реальные главы, но строгий
+# regex требовал совпадения всей строки.
+_HEADING_KEYS = [
+    ("definition", re.compile(r"определен|этиологи|патогенез|классификац|эпидемиологи|"
+                              r"краткое описание|общая информация|термин", re.I)),
+    ("diagnostics", re.compile(r"диагностик|клиническая картина|[cс]имптом|жалоб|осмотр|"
+                               r"обследован|анамнез", re.I)),
+    ("treatment", re.compile(r"лечен|терапи|реабилитац|оперативн|хирург", re.I)),
+    ("referral_criteria", re.compile(r"госпитализац|направлен|организация оказания", re.I)),
+    ("prevention", re.compile(r"профилактик|диспансерн|вакцин", re.I)),
+    ("complications", re.compile(r"осложнен|прогноз|исходы заболевания", re.I)),
+]
+
+
+def _section_of_heading(line: str) -> str | None:
+    """Раздел по заголовку, распознанному по шрифту (мягкое правило)."""
+    ln = (line or "").strip()
+    if not ln or len(ln) > 120:
+        return None
+    for sec, rx in _HEADING_KEYS:
+        if rx.search(ln):
+            return sec
+    return None
+
+
+def _norm_line(s: str) -> str:
+    return re.sub(r"\s+", " ", (s or "").lower().replace("ё", "е")).strip()
+
+
 def build_index_chunks(pages: list[dict]) -> list[dict]:
     """Чанки для поискового индекса: документ покрывается РОВНО ОДИН РАЗ,
     каждый чанк помечен своим разделом и реальными страницами.
@@ -127,6 +159,9 @@ def build_index_chunks(pages: list[dict]) -> list[dict]:
 
     for p in pages:
         page_no = p.get("page", 1)
+        # Заголовки этой страницы, подтверждённые вёрсткой (может не быть: txt,
+        # скан, старая версия лоадера). Сравниваем по нормализованному тексту.
+        page_heads = {_norm_line(h) for h in (p.get("headings") or []) if h}
         for ln in (p.get("text") or "").split("\n"):
             if _is_furniture(ln) or _is_reference_line(ln):
                 continue  # колонтитулы и библиография в индекс не идут
@@ -134,7 +169,10 @@ def build_index_chunks(pages: list[dict]) -> list[dict]:
                 flush()
                 cur = "references"
                 continue
-            hit = _section_of_line(ln)
+            if page_heads and _norm_line(ln) in page_heads:
+                hit = _section_of_heading(ln) or _section_of_line(ln)
+            else:
+                hit = _section_of_line(ln)
             if hit and hit != cur:
                 flush()
                 cur = hit
