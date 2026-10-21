@@ -121,3 +121,18 @@ describe('api', () => {
     await expect(api('/history')).rejects.toMatchObject({ status: 401 });
   });
 });
+
+describe('версия API', () => {
+  it('все запросы уходят под /v1', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      urls.push(String(url));
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    await api('/health');
+    await api('/dosage', { method: 'POST', body: '{}' });
+    await apiStream('/chat/stream', { query: 'x' }, () => {});
+    expect(urls.length).toBe(3);
+    for (const u of urls) expect(u).toMatch(/\/v1\//);
+  });
+});

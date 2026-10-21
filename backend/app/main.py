@@ -45,6 +45,11 @@ app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS,
 
 # Request-id: один id на запрос, в заголовке ответа и в каждой строке лога.
 # Путь логируем без query string — в GET /chat/stream там клинический текст.
+# Здесь же помечаем устаревшие (неверсионированные) пути: контракт живёт в /v1,
+# а старые адреса продолжают работать, чтобы не ломать уже установленные клиенты.
+_UNVERSIONED_OK = {"/health", "/docs", "/redoc", "/openapi.json", "/", "/favicon.ico"}
+
+
 @app.middleware("http")
 async def request_context(request: Request, call_next):
     rid = sanitize_request_id(request.headers.get("X-Request-ID"))
@@ -54,9 +59,13 @@ async def request_context(request: Request, call_next):
         response = await call_next(request)
         ms = round((time.monotonic() - t0) * 1000, 1)
         response.headers["X-Request-ID"] = rid
+        path = request.url.path
+        if not path.startswith("/v1") and path not in _UNVERSIONED_OK:
+            response.headers["Deprecation"] = "true"
+            response.headers["Link"] = f'</v1{path}>; rel="successor-version"'
         # Логируем ДО сброса контекста, иначе в строке будет [req=-].
-        if request.url.path != "/health":
-            log.info("%s %s -> %s %.1fms", request.method, request.url.path,
+        if path != "/health":
+            log.info("%s %s -> %s %.1fms", request.method, path,
                      response.status_code, ms)
         return response
     except Exception:
@@ -91,10 +100,13 @@ if os.getenv("LORAI_TESTING") != "1":
         "audit": repo.purge_old_audit(settings.AUDIT_RETENTION_DAYS),
     }
 
-app.include_router(system.router)
-app.include_router(auth_routes.router)
-app.include_router(chat.router)
-app.include_router(account.router)
-app.include_router(protocols.router)
-app.include_router(clinical.router)
-app.include_router(admin.router)
+API_ROUTERS = (system.router, auth_routes.router, chat.router, account.router,
+               protocols.router, clinical.router, admin.router)
+
+# Версионирование контракта. `/v1` — канонический путь и единственный, что
+# попадает в OpenAPI. Пути без префикса продолжают работать (мобильный клиент,
+# скрипты, закладки), но помечаются Deprecation + Link на /v1 и в схему не
+# включаются: новый клиент не должен их видеть.
+for _r in API_ROUTERS:
+    app.include_router(_r, prefix="/v1")
+    app.include_router(_r, include_in_schema=False)

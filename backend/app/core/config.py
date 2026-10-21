@@ -29,6 +29,19 @@ class Settings(BaseSettings):
     # Вес лексической составляющей поверх эмбеддингов (калибруется замером):
     # клинически соседние темы (острый/хронический отит) ловятся точным термином.
     HYBRID_WEIGHT: float = 0.0
+    # Реранкер: переупорядочивает топ кандидатов кросс-энкодером. По умолчанию
+    # ВЫКЛЮЧЕН — включается только после замера на hold-out (docs/RETRIEVAL_EVAL.md).
+    # Модель — русскоязычный кросс-энкодер на rubert-base, обученный на mMARCO.
+    RERANK_BACKEND: str = "off"  # off | cross
+    RERANK_MODEL: str = "DiTy/cross-encoder-russian-msmarco"
+    # Сколько кандидатов отдаём реранкеру: больше — точнее и медленнее.
+    RERANK_TOP_N: int = 20
+    RERANK_BATCH: int = 16
+    # Вес кросс-энкодера в итоговом порядке (0 — только косинус, 1 — только
+    # реранкер). Чистый реранкер поднимает recall, но роняет MRR: он тянет
+    # нужный протокол в топ-6, сдвигая лучший чанк вниз. Смесь калибруется
+    # замером на hold-out — см. docs/RETRIEVAL_EVAL.md.
+    RERANK_BLEND: float = 0.5
     JWT_SECRET: str = "change-me-in-production-please"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
@@ -45,7 +58,9 @@ class Settings(BaseSettings):
     # риск: ПДн-фильтр на входе не абсолютен. 0 — не чистить (не рекоменуется).
     QUERY_RETENTION_DAYS: int = 90
     AUDIT_RETENTION_DAYS: int = 365
-    APP_VERSION: str = "1.4.0"
+    # Формат логов: text (человеку) | json (Loki/ELK: одна строка — одна запись).
+    LOG_FORMAT: str = "text"
+    APP_VERSION: str = "1.6.0"
     class Config:
         env_file = ".env"
         extra = "ignore"

@@ -27,6 +27,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DEFAULT_GOLDEN = os.path.join(ROOT, "data", "eval", "lor_retrieval_golden.json")
+HOLDOUT = os.path.join(ROOT, "data", "eval", "lor_retrieval_holdout.json")
 
 
 def _norm(s: str) -> str:
@@ -46,6 +47,7 @@ def run(golden_path: str, k: int, threshold: float | None, show_fails: bool,
         routing: bool = True, general_cap: int | None = None) -> dict:
     from app.core.config import settings
     from app.knowledge_base.vector_store import VectorStore
+    from app.rag import reranker
     from app.rag.anti_hallucination import effective_threshold, should_refuse
     from app.rag.retriever import retrieve
 
@@ -55,6 +57,7 @@ def run(golden_path: str, k: int, threshold: float | None, show_fails: bool,
     th = effective_threshold(vs.backend) if threshold is None else threshold
     backend = vs.backend_name()
     print(f"Поисковый бэкенд: {backend} | порог отказа: {th} | k={k} | маршрутизация: {routing} | general_cap: {general_cap}")
+    print(f"Реранкер: {'вкл (' + settings.RERANK_MODEL + ', top-' + str(settings.RERANK_TOP_N) + ')' if reranker.enabled() else 'выкл'}")
     print(f"Золотой набор: {golden_path}\n")
 
     rows = []
@@ -138,7 +141,26 @@ def main() -> int:
                     help="выключить маршрутизацию вопроса по разделам (для сравнения)")
     ap.add_argument("--general-cap", type=int, default=None,
                     help="предел обзорных чанков в топ-k при известном разделе")
+    ap.add_argument("--holdout", action="store_true",
+                    help="считать на hold-out наборе (out-of-sample), а не на золотом")
+    ap.add_argument("--rerank", action="store_true",
+                    help="включить реранкер (RERANK_BACKEND=cross) для этого прогона")
+    ap.add_argument("--rerank-blend", type=float, default=None,
+                    help="вес кросс-энкодера в смеси (0..1); по умолчанию RERANK_BLEND")
+    ap.add_argument("--rerank-top-n", type=int, default=None,
+                    help="сколько кандидатов отдавать реранкеру (по умолчанию RERANK_TOP_N)")
     args = ap.parse_args()
+
+    # env выставляем ДО импорта app.core.config: settings читает окружение при
+    # создании объекта, поэтому флаг должен попасть туда раньше.
+    if args.rerank:
+        os.environ["RERANK_BACKEND"] = "cross"
+    if args.rerank_blend is not None:
+        os.environ["RERANK_BLEND"] = str(args.rerank_blend)
+    if args.rerank_top_n is not None:
+        os.environ["RERANK_TOP_N"] = str(args.rerank_top_n)
+    if args.holdout and args.golden == DEFAULT_GOLDEN:
+        args.golden = HOLDOUT
 
     report = run(args.golden, args.k, args.threshold, args.show_fails,
                  routing=not args.no_routing, general_cap=args.general_cap)

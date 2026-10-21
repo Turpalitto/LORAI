@@ -35,8 +35,16 @@ def section_hint(query: str) -> list[str]:
 
 def retrieve(store, query: str, k: int = 6, filters: dict | None = None,
              general_cap: int | None = None) -> list[dict]:
-    """Единая точка поиска: стор + маршрутизация вопроса по разделам.
+    """Единая точка поиска: стор + маршрутизация вопроса по разделам (+ реранкер).
+
     Одну и ту же функцию используют приложение и замер — метрика измеряет
-    ровно то, что видит врач."""
-    return store.search(query, k=k, filters=filters,
-                        section_boost=section_hint(query), general_cap=general_cap)
+    ровно то, что видит врач. Реранкер (если включён) забирает больше
+    кандидатов, чем нужно, и оставляет k лучших; score в выдаче остаётся
+    честным косинусом, поэтому порог отказа не меняется.
+    """
+    from . import reranker
+
+    n = max(k, int(reranker.settings.RERANK_TOP_N)) if reranker.enabled() else k
+    chunks = store.search(query, k=n, filters=filters,
+                          section_boost=section_hint(query), general_cap=general_cap)
+    return reranker.rerank(query, chunks, k)

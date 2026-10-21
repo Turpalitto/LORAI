@@ -16,6 +16,9 @@ os.environ["LORAI_TESTING"] = "1"
 # Тесты всегда на MockLLM: иначе боевой LLM_API_KEY из .env заставит
 # прогоны ходить в сеть (платно, медленно, flaky). Real LLM.
 os.environ["LLM_PROVIDER"] = "mock"
+# Реранкер в тестах выключен: он тянет 700-МБ кросс-энкодер и добавляет
+# ~1 с на запрос. Его логика покрыта заглушкой в test_reranker_logs.py.
+os.environ["RERANK_BACKEND"] = "off"
 # Врачебный аккаунт больше не захардкожен в app.main — тесты RBAC создают
 # его явно через env (в проде дефолтного doctor@lorai.local/doctor123 нет).
 os.environ["LORAI_DOCTOR_EMAIL"] = "doctor@lorai.local"

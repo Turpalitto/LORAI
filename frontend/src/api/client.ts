@@ -1,5 +1,8 @@
 export const API = (import.meta as any).env.VITE_API_URL || 'http://localhost:8000';
-export const APP_VERSION = '1.4.0';
+/* Версия контракта: канонические пути живут под /v1 (backend монтирует роутеры
+   дважды — /v1 и legacy без префикса, который помечен Deprecation). */
+export const API_PREFIX = '/v1';
+export const APP_VERSION = '1.6.0';
 export const DISC =
   'Справочный инструмент для врача. Решение принимает врач. Не вводите персональные данные пациента (ФИО, телефон, паспорт, СНИЛС).';
 
@@ -73,7 +76,7 @@ function startFetch(url: string, opts: RequestInit, timeoutMs: number, outer?: A
 
 export async function api(path: string, opts: any = {}, timeoutMs = 30000) {
   const { res, cleanup } = startFetch(
-    API + path,
+    API + API_PREFIX + path,
     {
       ...opts,
       headers: { 'Content-Type': 'application/json', ...authHeader(), ...(opts.headers || {}) },
@@ -114,7 +117,7 @@ export async function apiStream(
   timeoutMs = 120000,
 ): Promise<void> {
   const { res, cleanup } = startFetch(
-    API + path,
+    API + API_PREFIX + path,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...authHeader() },

@@ -13,20 +13,32 @@ core/
   security.py           JWT (PBKDF2), revoke
   migrations.py         ensure_schema → alembic upgrade head (+ legacy stamp 0002)
 routers/
-  auth.py               /auth/*        логин, refresh, logout, me
-  system.py             /health, /ready, /metrics, /version
-  chat.py               /chat, /chat/stream (SSE), /search-protocol
-  account.py            /history, /account/*
-  protocols.py          /protocols, /protocols/{id} (асинхронная загрузка + polling)
-  clinical.py           /dosage, /diff, /checklist, /templates, /referral
+  auth.py               /auth/login (троттлинг неудачных попыток; logout — клиентский,
+                        серверный отзыв через active=0 в таблице users)
+  system.py             /health (ok/degraded + версия, без внутренностей)
+  chat.py               /chat, /chat/stream (SSE, GET и POST)
+  account.py            /history, /feedback, /favorites (+ DELETE /favorites/{id})
+  protocols.py          /protocols, /protocols/{id}, /protocols/{id}/related, /search-protocol,
+                        /checklist/{id}, /templates/{kind}/{id}, /referral-check, /contradictions
+  clinical.py           /dosage, /diff-diagnosis, /drug-check, /red-flags,
+                        /calculators/*, /regimen/parse, /regimen/validate
   admin.py              /admin/*       документы, загрузка PDF, пользователи, аудит
 services/
   uploads.py            _process_upload + per-file/per-doc блокировки
-clinical/               normalizer.py + data/{drugs,routes,units}.json (из antibio-calc)
+clinical/               normalizer.py + validator.py + data/{drugs,routes,units}.json (из antibio-calc)
 ingestion/              pdf_loader → table_parser → icd10 → llm_structurer → pipeline
 knowledge_base/         SQLAlchemy (Document, QueryLog, User, AuditLog) + VectorStore
-rag/                    intent → retrieval top-k → threshold → prompt → generator → анти-галлюцинация
+rag/                    intent → retrieval top-k → [reranker] → threshold → prompt → generator
+                        → анти-галлюцинация
 ```
+
+Версионирование: роутеры монтируются дважды — `/v1/...` (канонический путь, попадает
+в OpenAPI) и без префикса (совместимость, помечен `Deprecation` + `Link` на `/v1`,
+из схемы скрыт). `/health` — вне версий, это операционный эндпоинт.
+
+Реранкер (`rag/reranker.py`) выключен по умолчанию: включается `RERANK_BACKEND=cross`
+после замера на hold-out (см. `docs/RETRIEVAL_EVAL.md` §реранкер). Он меняет только
+порядок, `score` остаётся честным косинусом — иначе врёт порог отказа.
 
 Поток запроса: `routers/* → rag/generator → knowledge_base (SQL + VectorStore) → LLM → проверка чисел → ответ`.
 Загрузка: `routers/protocols|admin → services/uploads._process_upload` (BackgroundTasks) → `ingestion/pipeline` → документ `processing → ready|failed`.
