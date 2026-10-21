@@ -15,9 +15,9 @@ def auth(authorization: str = Header(default="")) -> dict:
 
     Роль берётся из БД, а не из токена: иначе понижение в правах или
     отключение учётки не действовало бы до истечения токена (8 часов).
-    Токен для несуществующего пользователя (например, выданный до переезда
-    учёток в БД) пропускается с ролью из токена — иначе все сессии умерли бы
-    при деплое.
+    Токен для несуществующего пользователя отклоняется: раньше он проходил
+    с ролью ИЗ ТОКЕНА, то есть уволенный сотрудник (или удалённая учётка)
+    продолжал работать админом до истечения токена.
     """
     if not authorization.startswith("Bearer "):
         raise HTTPException(401, "Нет токена")
@@ -26,18 +26,21 @@ def auth(authorization: str = Header(default="")) -> dict:
     except Exception:
         raise HTTPException(401, "Неверный токен")
     u = repo.get_user(payload.get("sub", ""))
-    if u:
-        if not u["active"]:
-            raise HTTPException(403, "Учётная запись отключена")
-        payload["role"] = u["role"]
+    if not u:
+        raise HTTPException(401, "Учётная запись не найдена")
+    if not u["active"]:
+        raise HTTPException(403, "Учётная запись отключена")
+    payload["role"] = u["role"]
     return payload
 
 
 def optional_auth(authorization: str = Header(default="")) -> dict:
     """Мягкая аутентификация для публичных эндпоинтов (/chat, /chat/stream).
 
-    Токен есть — знаем, кто спросил (нужно для истории запросов); нет, битый
-    или учётка отключена — работаем как гость, но автора пишем явно.
+    Без токена или с битым токеном — гость (публичный чат). Но если токен
+    валиден, а учётки уже нет или она отключена, отвечаем 401/403: иначе
+    отключённый врач продолжал спрашивать как гость, и отзыв доступа не
+    действовал до истечения токена.
     """
     if not authorization.startswith("Bearer "):
         return {}
@@ -46,10 +49,11 @@ def optional_auth(authorization: str = Header(default="")) -> dict:
     except Exception:
         return {}
     u = repo.get_user(payload.get("sub", ""))
-    if u:
-        if not u["active"]:
-            return {}
-        payload["role"] = u["role"]
+    if not u:
+        raise HTTPException(401, "Учётная запись не найдена")
+    if not u["active"]:
+        raise HTTPException(403, "Учётная запись отключена")
+    payload["role"] = u["role"]
     return payload
 
 
@@ -58,8 +62,27 @@ def uid(user: dict) -> str:
     return (user or {}).get("sub") or "guest"
 
 
-def client_ip(request: Request) -> str:
+def resolve_client_ip(request: Request) -> str:
+    """IP клиента с учётом обратного прокси.
+
+    `get_remote_address` возвращает адрес TCP-соединения: за nginx это адрес
+    прокси, то есть один и тот же для всех врачей. Тогда лимит 30/мин и IP в
+    аудите относятся ко всем сразу. X-Forwarded-For учитываем только при
+    `TRUST_PROXY_HEADERS=1` — иначе любой клиент подделает себе IP заголовком.
+    """
+    from .config import settings
+
+    if settings.TRUST_PROXY_HEADERS:
+        xff = request.headers.get("x-forwarded-for", "")
+        if xff:
+            first = xff.split(",")[0].strip()
+            if first:
+                return first
     return get_remote_address(request) or ""
+
+
+def client_ip(request: Request) -> str:
+    return resolve_client_ip(request)
 
 
 def admin_only(user: dict = Depends(auth)) -> dict:

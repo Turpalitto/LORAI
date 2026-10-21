@@ -8,46 +8,60 @@ Excellence этап 2/6 (скорость на приёме, оптимизац�
 - записи с session_id НЕ кэшируются: раскрытие follow-up зависит от истории
   диалога и кэширование дало бы чужой контекст.
 """
+import threading
 import time
 from collections import OrderedDict, deque
 
 class TTLCache:
+    """Потокобезопасный TTL-LRU.
+
+    `get` делает pop + reinsert (обновление LRU), а `set` — eviction, поэтому
+    без замка два потока на одном ключе роняли OrderedDict (RuntimeError
+    «dictionary changed size during iteration») и теряли записи. Замок
+    один и грубый: операции короткие, а кэш не горячее точки.
+    """
+
     def __init__(self, maxsize: int = 256, ttl: float = 300.0):
         self.maxsize = maxsize
         self.ttl = ttl
         self._d: OrderedDict[str, tuple[float, object]] = OrderedDict()
+        self._lock = threading.Lock()
         self.hits = 0
         self.misses = 0
 
     def get(self, key: str):
         now = time.monotonic()
-        try:
-            exp, val = self._d.pop(key)
-        except KeyError:
-            self.misses += 1
-            return None
-        if exp < now:
-            self.misses += 1
-            return None
-        self._d[key] = (exp, val)  # refresh LRU
-        self.hits += 1
-        return val
+        with self._lock:
+            try:
+                exp, val = self._d.pop(key)
+            except KeyError:
+                self.misses += 1
+                return None
+            if exp < now:
+                self.misses += 1
+                return None
+            self._d[key] = (exp, val)  # refresh LRU
+            self.hits += 1
+            return val
 
     def set(self, key: str, value: object):
-        self._d[key] = (time.monotonic() + self.ttl, value)
-        self._d.move_to_end(key)
-        while len(self._d) > self.maxsize:
-            self._d.popitem(last=False)
+        with self._lock:
+            self._d[key] = (time.monotonic() + self.ttl, value)
+            self._d.move_to_end(key)
+            while len(self._d) > self.maxsize:
+                self._d.popitem(last=False)
 
     def clear(self):
         """Полная инвалидация: вызывается при загрузке нового документа —
         закэшированные «не найдено» не должны переживать пополнение базы."""
-        self._d.clear()
+        with self._lock:
+            self._d.clear()
 
     def stats(self) -> dict:
-        total = self.hits + self.misses
-        return {"hits": self.hits, "misses": self.misses, "size": len(self._d),
-                "hit_rate": round(self.hits / total, 3) if total else 0.0}
+        with self._lock:
+            total = self.hits + self.misses
+            return {"hits": self.hits, "misses": self.misses, "size": len(self._d),
+                    "hit_rate": round(self.hits / total, 3) if total else 0.0}
 
 
 cache = TTLCache()

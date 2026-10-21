@@ -14,7 +14,11 @@ class Settings(BaseSettings):
     EMBEDDING_THRESHOLD: float = 0.75
     DATABASE_URL: str = f"sqlite:///{ROOT_DIR}/lorai.db"
     CHROMA_DIR: str = str(ROOT_DIR / "data" / "vector_store")
-    VECTOR_BACKEND: str = "tfidf"  # tfidf | embeddings | chroma (DECISIONS #20, #26)
+    # Дефолт — измеренная рабочая конфигурация (embeddings), а не tfidf:
+    # прежний дефолт давал установке «из коробки» заметно худший поиск, чем
+    # в замерах. Если модель недоступна, стор честно откатывается на TF-IDF
+    # с причиной в /admin/health (DECISIONS #20, #26).
+    VECTOR_BACKEND: str = "embeddings"  # tfidf | embeddings | chroma
     EMBEDDING_MODEL: str = "intfloat/multilingual-e5-base"
     # Кэш модели держим внутри проекта: стенд самодостаточен и не зависит от
     # прав на ~/.cache (в песочнице запись туда запрещена).
@@ -28,7 +32,7 @@ class Settings(BaseSettings):
     GENERAL_CHUNK_CAP: int = 2
     # Вес лексической составляющей поверх эмбеддингов (калибруется замером):
     # клинически соседние темы (острый/хронический отит) ловятся точным термином.
-    HYBRID_WEIGHT: float = 0.0
+    HYBRID_WEIGHT: float = 0.15
     # Реранкер: переупорядочивает топ кандидатов кросс-энкодером. По умолчанию
     # ВЫКЛЮЧЕН — включается только после замера на hold-out (docs/RETRIEVAL_EVAL.md).
     # Модель — русскоязычный кросс-энкодер на rubert-base, обученный на mMARCO.
@@ -41,7 +45,7 @@ class Settings(BaseSettings):
     # реранкер). Чистый реранкер поднимает recall, но роняет MRR: он тянет
     # нужный протокол в топ-6, сдвигая лучший чанк вниз. Смесь калибруется
     # замером на hold-out — см. docs/RETRIEVAL_EVAL.md.
-    RERANK_BLEND: float = 0.5
+    RERANK_BLEND: float = 0.3
     JWT_SECRET: str = "change-me-in-production-please"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
@@ -60,7 +64,10 @@ class Settings(BaseSettings):
     AUDIT_RETENTION_DAYS: int = 365
     # Формат логов: text (человеку) | json (Loki/ELK: одна строка — одна запись).
     LOG_FORMAT: str = "text"
-    APP_VERSION: str = "1.7.2"
+    # За обратным прокси реальный IP приходит в X-Forwarded-For. Без этого
+    # лимитер и аудит видят один адрес прокси на всех врачей (30/мин на всех).
+    TRUST_PROXY_HEADERS: bool = False
+    APP_VERSION: str = "1.8.0"
     class Config:
         env_file = ".env"
         extra = "ignore"

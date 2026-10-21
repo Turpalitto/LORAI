@@ -8,6 +8,17 @@ REFUSAL = "В загруженных клинических рекомендац
 _NUM_RX = re.compile(r"(?<![\d.,])\d+(?:[.,]\d+)?(?![\d.,])")
 # «1 000 мг» / «1 500» — разрядные пробелы внутри числа склеиваем
 _THOUSANDS_RX = re.compile(r"(?<=\d)[\s\u00a0](?=\d{3}(?!\d))")
+# Ссылка на источник в ответе: [Документ: КР, Раздел: Лечение, Стр. 12].
+# Номер страницы — не факт из протокола, а адрес цитаты: он не обязан
+# встречаться в тексте контекста (page_range лежит отдельным полем), поэтому
+# раньше КАЖДЫЙ ответ с корректной ссылкой получал предупреждение «числа
+# требуют проверки» из-за «Стр. 12».
+_CITE_RX = re.compile(r"\[[^\]]{0,300}?\]")
+_PAGE_RX = re.compile(r"\b(?:стр\.?|страниц[аы]|с\.)\s*\d+(?:\s*[-–]\s*\d+)?", re.I)
+# Число с единицей: доза «5 мг» и объём «5 мл» — разные факты, хотя число одно.
+_UNIT_RX = re.compile(
+    r"(?<![\d.,])(\d+(?:[.,]\d+)?)\s*(мг/кг|мг/мл|мкг|мг|мл|г|ед|ме|таб\.?|капл\.?|сут|дн|нед)",
+    re.I)
 
 
 def _numbers(text: str) -> set[str]:
@@ -15,11 +26,37 @@ def _numbers(text: str) -> set[str]:
     return {m.group(0).replace(",", ".") for m in _NUM_RX.finditer(flat)}
 
 
+def _pairs(text: str) -> dict[str, set[str]]:
+    """Число → единицы, с которыми оно встречается («5»: {"мг"})."""
+    flat = _THOUSANDS_RX.sub("", text or "")
+    out: dict[str, set[str]] = {}
+    for m in _UNIT_RX.finditer(flat):
+        num = m.group(1).replace(",", ".")
+        unit = m.group(2).lower().replace(".", "")
+        out.setdefault(num, set()).add(unit)
+    return out
+
+
+def _strip_citations(text: str) -> str:
+    """Убираем адреса цитат: страницы и квадратные скобки-ссылки."""
+    return _PAGE_RX.sub(" ", _CITE_RX.sub(" ", text or ""))
+
+
 def check_numbers(answer: str, chunks: list[dict]) -> str:
-    nums = _numbers(answer)
+    clean = _strip_citations(answer)
+    nums = _numbers(clean)
     ctx = " ".join(c.get("text", "") for c in chunks)
     ctx_nums = _numbers(ctx)
+    ctx_pairs = _pairs(ctx)
+    ans_pairs = _pairs(clean)
     bad = sorted(n for n in nums if n not in ctx_nums)
+    # Число есть в контексте, но с другой единицей: «5 мг» в ответе при «5 мл»
+    # в источнике — это подмена единицы, а не совпадение.
+    for num, units in ans_pairs.items():
+        if num in ctx_nums and units and num in ctx_pairs:
+            if not (units & ctx_pairs[num]):
+                bad.append(f"{num} {'/'.join(sorted(units))}")
+    bad = sorted(set(bad))
     if bad:
         return answer + "\n\n⚠️ Числа требуют проверки врачом: " + ", ".join(bad[:5])
     return answer
@@ -54,29 +91,43 @@ LOR_MARKERS = [
     "аденоид", "аденотом",
     # общее ЛОР + вестибулярное
     "лор", "оториноларинг", "вестибуляр", "головокружен", "нистагм", "отоневролог",
-    # Лекарства из ЛОР-протоколов и дозировочная лексика: вопрос «доза
-    # амоксициллина ребёнку» — легитимный, скор-гейт отсекает вне-доменные
-    # совпадения.
+    # Лекарства из ЛОР-протоколов. Дозировочная лексика («доза», «дозировка»,
+    # «мг/кг», «ребёнок», «детский», «педиатр») отсюда убрана: она делала
+    # ЛОР-вопросом «дозу инсулина ребёнку». Названия препаратов остаются —
+    # «доза амоксициллина ребёнку» по-прежнему проходит гейт.
     "амоксициллин", "азитромицин", "цефтриаксон", "цефиксим", "кларитромицин",
     "отипакс", "називин", "изофра", "полидекса", "софрадекс", "анауран",
-    "доза", "дозировк", "мг/кг", "ребен", "детск", "педиатр",
 ]
 ICD_LOR = re.compile(r"\b([HJ]\d{2}(?:\.\d{1,2})?|C3[012]|C73)\b", re.IGNORECASE)
 
 # Маркеры длиной ≥5 символов ищем как подстроку (они специфичны: «тонзилл»
-# находится и в «паратонзиллярном»), короткие — только с начала слова, иначе
-# «флорист» дал бы «лор», а «перенос» — «нос».
+# находится и в «паратонзиллярном»). Короткие — только целым словом с
+# окончанием: раньше «ух»/«уш»/«нос» искались как подстрока с границей
+# только слева, поэтому «ушиб колена», «ухудшение после инфаркта» и «носит
+# ли маску» считались ЛОР-вопросами и получали ответ вместо отказа.
 _LONG_MARKERS = [m for m in LOR_MARKERS if len(m) >= 5]
-_SHORT_MARKERS = [m for m in LOR_MARKERS if len(m) < 5]
+# Три коротких маркера — источник ложных срабатываний, поэтому для них
+# перечислены допустимые словоформы и требуется правая граница слова:
+# «ушиб», «ухудшение», «уход», «носит» больше не считаются ЛОР-темой.
+_STRICT_SHORT = {
+    "ух": r"ух(?:о|а|е|у|ом|и|ей|ам|ами|ах)",
+    "уш": r"уш(?:и|ей|ам|ами|ах|ко|ка|ке|ку)",
+    "нос": r"нос(?:а|у|е|ом|ы|ов|ам|ами|ах)?",
+}
+_SHORT_MARKERS = [m for m in LOR_MARKERS if len(m) < 5 and m not in _STRICT_SHORT]
 _LONG_RX = re.compile("|".join(re.escape(m) for m in _LONG_MARKERS))
-_SHORT_RX = re.compile(r"(?<![а-яa-z0-9])(?:" + "|".join(re.escape(m) for m in _SHORT_MARKERS) + ")")
+_SHORT_RX = re.compile(
+    r"(?<![а-яa-z0-9])(?:" + "|".join(re.escape(m) for m in _SHORT_MARKERS) + r")"
+)
+_STRICT_SHORT_RX = re.compile(
+    r"(?<![а-яa-z0-9])(?:" + "|".join(_STRICT_SHORT.values()) + r")(?![а-яa-z0-9])")
 
 
 def has_lor_signal(query: str) -> bool:
     q = norm_query(query)
     if ICD_LOR.search(q):
         return True
-    return bool(_LONG_RX.search(q) or _SHORT_RX.search(q))
+    return bool(_LONG_RX.search(q) or _SHORT_RX.search(q) or _STRICT_SHORT_RX.search(q))
 
 
 def effective_threshold(backend: str) -> float:
