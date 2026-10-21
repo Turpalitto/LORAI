@@ -21,5 +21,6 @@ frontend/test-results/
 playwright-report/
 lorai-home.png
 .pytest_tmp/
+.pytest-tmp/
 lorai.db.bak-*
 .workbuddy-ai/
