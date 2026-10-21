@@ -68,11 +68,18 @@ def run(golden_path: str, k: int, threshold: float | None, show_fails: bool,
         rank = next((i + 1 for i, c in enumerate(chunks) if _matches(c, item.get("protocols") or ["\0"])), None)
         sections = [c.get("section", "") for c in chunks]
         want = item.get("sections") or ([item["section"]] if item.get("section") else [])
+        # MRR по одному протоколу завышается мусорными чанками: «Приказ Минздрава»
+        # в разделе лечения считался попаданием с первого места. Вторая метрика
+        # требует ещё и нужный раздел — это «первая цитата, которую врач прочтёт».
+        rank_content = next((i + 1 for i, c in enumerate(chunks)
+                             if _matches(c, item.get("protocols") or ["\0"])
+                             and (not want or c.get("section") in want)), None)
         section_hit = None if not want else any(w in sections for w in want)
         section_hit_relaxed = None if not want else any(w in sections or "general" in sections for w in want)
         rows.append({
             "id": item["id"], "kind": item["kind"], "q": item["q"],
-            "top_score": round(top, 4), "rank": rank, "refused": refused,
+            "top_score": round(top, 4), "rank": rank, "rank_content": rank_content,
+            "refused": refused,
             "section_hit": section_hit, "section_hit_relaxed": section_hit_relaxed,
             "sections": sections,
             "docs": [c.get("nosology") or c.get("document") for c in chunks],
@@ -81,6 +88,7 @@ def run(golden_path: str, k: int, threshold: float | None, show_fails: bool,
     ind = [r for r in rows if r["kind"] == "in_domain"]
     out = [r for r in rows if r["kind"] == "out_of_domain"]
     hits = [r for r in ind if r["rank"]]
+    content = [r for r in ind if r["rank_content"]]
     sec = [r for r in ind if r["section_hit"] is not None]
     sec_rel = [r for r in ind if r["section_hit_relaxed"] is not None]
 
@@ -92,6 +100,9 @@ def run(golden_path: str, k: int, threshold: float | None, show_fails: bool,
         "n_out_of_domain": len(out),
         "recall_at_k": round(len(hits) / max(1, len(ind)), 4),
         "mrr_at_k": round(mean([1.0 / r["rank"] for r in hits]) if hits else 0.0, 4),
+        # MRR по «протокол + нужный раздел»: не награждает мусорный чанк того же
+        # протокола (приказ Минздрава в разделе лечения) за первое место.
+        "mrr_content_at_k": round(mean([1.0 / r["rank_content"] for r in content]) if content else 0.0, 4),
         "recall_at_1": round(sum(1 for r in ind if r["rank"] == 1) / max(1, len(ind)), 4),
         "section_at_k": round(sum(1 for r in sec if r["section_hit"]) / max(1, len(sec)), 4),
         # Главная метрика содержания: и протокол верный, и нужный раздел в топ-k
