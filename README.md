@@ -46,6 +46,12 @@ cd frontend && npm test && npm run build
 `--basetemp` нужен только в песочнице, где запрещена запись в `/private/var/folders`.
 Маркер `slow` — тесты, поднимающие модель эмбеддингов.
 
+Актуальные цифры (1.7.1): backend 182 теста за 97 с, быстрый цикл 164 за 62 с, frontend 36 тестов, сборка 162.05 kB / 53.78 kB gzip.
+
+Frontend собирается только на Node из `.nvmrc` (24). На другой версии `vitest` и `vite` падают
+с `Cannot find module @rollup/rollup-darwin-arm64` — это не поломка кода, а несовпадение
+нативного бинарника rollup с платформой сборки `node_modules`. Проверка: `node -v` перед `npm test`.
+
 ## Замер качества, а не «на глаз»
 
 ```bash
