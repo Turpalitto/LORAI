@@ -11,6 +11,7 @@ const Chat = React.lazy(() => import('./pages/chat').then((m) => ({ default: m.C
 const ProtocolSearch = React.lazy(() => import('./pages/protocols').then((m) => ({ default: m.ProtocolSearch })));
 const ChecklistPage = React.lazy(() => import('./pages/checklist').then((m) => ({ default: m.ChecklistPage })));
 const DosageCalc = React.lazy(() => import('./pages/tools').then((m) => ({ default: m.DosageCalc })));
+const RegimenCheck = React.lazy(() => import('./pages/tools').then((m) => ({ default: m.RegimenCheck })));
 const Calculators = React.lazy(() => import('./pages/tools').then((m) => ({ default: m.Calculators })));
 const DiffDx = React.lazy(() => import('./pages/tools').then((m) => ({ default: m.DiffDx })));
 const Referral = React.lazy(() => import('./pages/tools').then((m) => ({ default: m.Referral })));
@@ -24,6 +25,7 @@ const NAV: [string, string][] = [
   ['chat', 'Чат'],
   ['protocols', 'Протоколы'],
   ['dosage', 'Дозировки'],
+  ['regimen', 'Схема'],
   ['calc', 'Калькуляторы'],
   ['diff', 'Дифдиагностика'],
   ['referral', 'Госпитализация'],
@@ -38,6 +40,7 @@ const TITLES: Record<string, string> = {
   chat: 'Чат-ассистент',
   protocols: 'Клинические рекомендации',
   dosage: 'Калькулятор дозировок',
+  regimen: 'Проверка схемы',
   calc: 'Клинические калькуляторы',
   diff: 'Дифференциальная диагностика',
   referral: 'Направление и госпитализация',
@@ -200,6 +203,7 @@ export default function App() {
     r === 'chat' ? <Chat /> :
     r.startsWith('protocols') ? <ProtocolSearch /> :
     r === 'dosage' ? <DosageCalc /> :
+    r === 'regimen' ? <RegimenCheck /> :
     r === 'calc' ? <Calculators /> :
     r === 'diff' ? <DiffDx /> :
     r === 'referral' ? <Referral /> :

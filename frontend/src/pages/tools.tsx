@@ -83,6 +83,118 @@ export function DosageCalc() {
   );
 }
 
+/* ---------- Проверка схемы (PASS / REVIEW / REJECT) ---------- */
+const VERDICT_STYLE: Record<string, { panel: string; label: string; hint: string }> = {
+  PASS: { panel: 'panel-ok', label: 'PASS — схема полная', hint: 'Все проверки пройдены. Это не одобрение назначения: решение за врачом.' },
+  REVIEW: { panel: 'panel-warn', label: 'REVIEW — нужно проверить', hint: 'Схема разобрана не полностью или в ней есть диапазон. Сверьте с текстом протокола.' },
+  REJECT: { panel: 'panel-danger', label: 'REJECT — непригодна как есть', hint: 'Препарат не распознан или дозы нет. Такую схему нельзя использовать как рекомендацию.' },
+};
+
+export function RegimenCheck() {
+  const [text, setText] = React.useState('Амоксициллин 500 мг внутрь 3 раза в сутки 7 дней');
+  const [w, setW] = React.useState('');
+  const [maxSingle, setMaxSingle] = React.useState('');
+  const [maxDaily, setMaxDaily] = React.useState('');
+  const [r, setR] = React.useState<any>(null);
+  const [err, setErr] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+
+  const num = (v: string) => {
+    const n = Number(v.replace(',', '.'));
+    return v.trim() && Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+
+  const go = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!text.trim()) { setErr('Вставьте текст схемы из протокола.'); return; }
+    setBusy(true); setErr(''); setR(null);
+    try {
+      setR(await api('/regimen/validate', {
+        method: 'POST',
+        body: JSON.stringify({
+          text,
+          weight_kg: num(w),
+          max_single_mg: num(maxSingle),
+          max_daily_mg: num(maxDaily),
+        }),
+      }));
+    } catch (e2) { setErr(humanError(e2)); }
+    setBusy(false);
+  };
+
+  const style = r ? (VERDICT_STYLE[r.verdict] || VERDICT_STYLE.REVIEW) : null;
+
+  return (
+    <div className="stagger">
+      <PageHeader id="reg-title" title="Проверка схемы" sub="Разбор схемы из текста протокола и вердикт: PASS, REVIEW или REJECT. Правила детерминированные, без ИИ; вердикт может только понижаться." />
+      <Card labelledBy="reg-title">
+        <form onSubmit={go}>
+          <label className="field">
+            Текст схемы из клинической рекомендации
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3}
+              placeholder="например: Амоксициллин 500 мг внутрь 3 раза в сутки 7 дней" />
+          </label>
+          <div className="form-line" style={{ marginTop: 10 }}>
+            <label className="field" style={{ flex: '1 1 150px' }}>
+              Вес, кг (для доз мг/кг)
+              <input value={w} onChange={(e) => setW(e.target.value)} inputMode="decimal" placeholder="необязательно" aria-label="Вес, кг" />
+            </label>
+            <label className="field" style={{ flex: '1 1 150px' }}>
+              Потолок разовой, мг
+              <input value={maxSingle} onChange={(e) => setMaxSingle(e.target.value)} inputMode="decimal" placeholder="необязательно" aria-label="Потолок разовой дозы, мг" />
+            </label>
+            <label className="field" style={{ flex: '1 1 150px' }}>
+              Потолок суточной, мг
+              <input value={maxDaily} onChange={(e) => setMaxDaily(e.target.value)} inputMode="decimal" placeholder="необязательно" aria-label="Потолок суточной дозы, мг" />
+            </label>
+            <Button type="submit" loading={busy} disabled={!text.trim()}>Проверить</Button>
+          </div>
+        </form>
+        <p className="caption" style={{ marginTop: 6 }}>
+          Потолки доз ЛОРАИ не подставляет: сертифицированной таблицы максимальных доз в системе нет,
+          поэтому границы передаёт врач или протокол.
+        </p>
+        {err && <div className="error-box" role="alert" style={{ marginTop: 10 }}>{err}</div>}
+      </Card>
+
+      {r && style && (
+        <div className={'panel ' + style.panel} role="status">
+          <b>{style.label}</b>
+          <p className="muted" style={{ margin: '6px 0 0' }}>{style.hint}</p>
+          <p style={{ margin: '8px 0 0' }}>
+            {r.regimen?.drug?.normalized || 'препарат не распознан'}
+            {r.regimen?.dose?.raw ? ` · ${r.regimen.dose.raw}` : ''}
+            {r.computed?.doses_per_day ? ` · ${r.computed.doses_per_day} раз/сут` : ''}
+            {r.computed?.single_mg != null ? ` · разово ${r.computed.single_mg} мг` : ''}
+            {r.computed?.daily_mg != null ? ` · в сутки ${r.computed.daily_mg} мг` : ''}
+          </p>
+          {(r.reasons || []).length > 0 && (
+            <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+              {(r.reasons || []).map((x: any) => (
+                <li key={x.code} style={{ margin: '3px 0' }}><b>{x.status}</b>: {x.message}</li>
+              ))}
+            </ul>
+          )}
+          <details style={{ marginTop: 10 }}>
+            <summary className="muted">Все проверки ({r.checks?.length || 0})</summary>
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              {(r.checks || []).map((c: any) => (
+                <li key={c.name} style={{ margin: '3px 0' }}>
+                  <span className={c.status === 'PASS' ? 'muted' : ''}>{c.status}</span> — {c.message}
+                </li>
+              ))}
+            </ul>
+          </details>
+          <div className="row" style={{ marginTop: 10 }}>
+            <CopyButton label="Вердикт" text={`${r.verdict}: ${(r.reasons || []).map((x: any) => x.message).join(' ') || 'замечаний нет'}`} />
+            <Button variant="ghost" onClick={() => chatHash(`Схема из протокола: ${text}. Что говорит протокол?`)}>Спросить в чате</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Калькуляторы ---------- */
 export function Calculators() {
   const [fever, setFever] = React.useState(false);

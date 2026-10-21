@@ -12,6 +12,10 @@ import pytest
 from app.knowledge_base.vector_store import VectorStore
 from app.rag.retriever import retrieve, section_hint
 
+# Модуль поднимает модель эмбеддингов (e5) — это десятки секунд на прогон.
+# Быстрый цикл разработки: `pytest -m "not slow"`.
+pytestmark = pytest.mark.slow
+
 GOLDEN = os.path.join(os.path.dirname(__file__), "..", "..", "data", "eval", "lor_retrieval_golden.json")
 
 

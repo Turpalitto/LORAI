@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ..clinical import normalize_drug, parse_frequency, parse_regimen
+from ..clinical import normalize_drug, parse_frequency, parse_regimen, validate_regimen
 from ..core.config import DISCLAIMER
 from ..core.deps import auth
 from ..features import differential_diagnosis as dd
@@ -127,3 +127,39 @@ def regimen_parse(b: RegimenIn):
     if not (b.text or "").strip():
         raise HTTPException(400, "Пустой текст")
     return {**parse_regimen(b.text[:5000]), "disclaimer": DISCLAIMER}
+
+
+class RegimenValidateIn(BaseModel):
+    text: str = ""
+    regimen: dict | None = None
+    weight_kg: float | None = None
+    max_single_mg: float | None = None
+    max_daily_mg: float | None = None
+
+
+@router.post("/regimen/validate")
+def regimen_validate(b: RegimenValidateIn):
+    """Вердикт по схеме: PASS / REVIEW / REJECT.
+
+    Принимает либо текст протокола (`text` — разбирается тем же нормализатором,
+    что и `/regimen/parse`), либо уже разобранную схему (`regimen`), если она
+    пришла из ингеста. `weight_kg` нужен для доз «мг/кг», `max_single_mg` /
+    `max_daily_mg` — потолки, которые знает вызывающая сторона.
+
+    Вердикт только понижается: PASS — все проверки пройдены, REVIEW — есть что
+    проверить врачом (нет кратности, диапазон, доза на кг без веса), REJECT —
+    препарат не распознан или дозы нет вовсе. Это не «одобрение назначения».
+    """
+    if b.regimen is not None:
+        parsed = b.regimen
+    elif (b.text or "").strip():
+        parsed = parse_regimen(b.text[:5000])
+    else:
+        raise HTTPException(400, "Нужен text или regimen")
+    return {
+        "regimen": parsed,
+        **validate_regimen(parsed, weight_kg=b.weight_kg,
+                           max_single_mg=b.max_single_mg,
+                           max_daily_mg=b.max_daily_mg),
+        "disclaimer": DISCLAIMER,
+    }
