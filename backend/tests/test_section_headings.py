@@ -101,3 +101,41 @@ def test_pdf_loader_returns_headings_key_even_for_text_file(tmp_path):
     pages = load_pages(str(p))
     assert pages[0]["headings"] == []
     assert "Определение" in pages[0]["text"]
+
+
+# ---------------------------------------------- маршрутизация вопроса (быстро)
+def test_section_hint_covers_real_doctor_phrasings():
+    """Врач пишет «чем лечить», а не «лечение»: форма глагола должна ловиться.
+
+    Регресс был живым: запрос «чем лечить острый средний отит у взрослого?»
+    получал пустой hint, и в выдачу шли чанки `definition` вместо лечения.
+    """
+    from app.rag.retriever import section_hint
+
+    cases = {
+        "чем лечить острый средний отит у взрослого?": "treatment",
+        "как лечить ангину у ребёнка": "treatment",
+        "какие антибиотики при отите": "treatment",
+        "чем промывать нос при синусите": "treatment",
+        "нужна ли операция при хроническом отите": "treatment",
+        "какие симптомы у отита": "diagnostics",
+        "дифференциальная диагностика оталгии": "diagnostics",
+        "что такое болезнь Меньера": "definition",
+        "профилактика рецидивирующего отита": "prevention",
+        "когда госпитализировать при паратонзиллярном абсцессе": "referral_criteria",
+    }
+    for q, want in cases.items():
+        assert section_hint(q) == [want], (q, section_hint(q), want)
+
+
+def test_referral_wins_over_treatment_when_both_match():
+    """«Госпитализировать» важнее «лечить»: узкая тема проверяется первой."""
+    from app.rag.retriever import section_hint
+
+    assert section_hint("стоит ли госпитализировать и как лечить абсцесс") == ["referral_criteria"]
+
+
+def test_general_question_has_no_hint():
+    from app.rag.retriever import section_hint
+
+    assert section_hint("расскажи про отит") == []
