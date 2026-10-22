@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     # За обратным прокси реальный IP приходит в X-Forwarded-For. Без этого
     # лимитер и аудит видят один адрес прокси на всех врачей (30/мин на всех).
     TRUST_PROXY_HEADERS: bool = False
-    APP_VERSION: str = "1.9.0"
+    APP_VERSION: str = "1.10.0"
     class Config:
         env_file = ".env"
         extra = "ignore"

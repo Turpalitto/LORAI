@@ -7,7 +7,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from slowapi.util import get_remote_address
 
 from ..knowledge_base import repository as repo
-from .security import decode_token
+from .security import TokenExpired, decode_token
 
 
 def auth(authorization: str = Header(default="")) -> dict:
@@ -23,6 +23,10 @@ def auth(authorization: str = Header(default="")) -> dict:
         raise HTTPException(401, "Нет токена")
     try:
         payload = decode_token(authorization[7:])
+    except TokenExpired:
+        # Сессия закончилась — это не атака и не «битый токен»: фронтенд по
+        # этому тексту отправляет врача на повторный вход вместо «неверный токен».
+        raise HTTPException(401, "Срок действия сессии истёк — войдите заново")
     except Exception:
         raise HTTPException(401, "Неверный токен")
     u = repo.get_user(payload.get("sub", ""))
@@ -46,6 +50,10 @@ def optional_auth(authorization: str = Header(default="")) -> dict:
         return {}
     try:
         payload = decode_token(authorization[7:])
+    except TokenExpired:
+        # Публичный эндпоинт: просроченный токен в localStorage не должен
+        # ломать гостевой чат — отвечаем как гостю, без 401.
+        return {}
     except Exception:
         return {}
     u = repo.get_user(payload.get("sub", ""))
