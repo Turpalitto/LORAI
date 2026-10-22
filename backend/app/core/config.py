@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     # 1.0 — выключить маршрутизацию по разделам. Калибруется замером:
     # scripts/eval_retrieval.py (см. docs/RETRIEVAL_EVAL.md).
     SECTION_BOOST: float = 1.15
+    # Во сколько раз приоритетнее чанк нозологии, которую распознали в вопросе
+    # (rag/retriever.nosology_hint). 1.0 — выключить. Значение измерено на
+    # hold-out: косинусы соседних протоколов отличаются на 0.005–0.01, поэтому
+    # без явного приоритета «лечение синусита» встаёт выше «лечения отита».
+    NOSOLOGY_BOOST: float = 1.15
     # Сколько обзорных (general) чанков допустимо в топ-k, когда вопрос про
     # конкретный раздел: иначе дубли-обзоры вытесняют нужный раздел.
     GENERAL_CHUNK_CAP: int = 2
@@ -67,7 +72,7 @@ class Settings(BaseSettings):
     # За обратным прокси реальный IP приходит в X-Forwarded-For. Без этого
     # лимитер и аудит видят один адрес прокси на всех врачей (30/мин на всех).
     TRUST_PROXY_HEADERS: bool = False
-    APP_VERSION: str = "1.8.0"
+    APP_VERSION: str = "1.9.0"
     class Config:
         env_file = ".env"
         extra = "ignore"

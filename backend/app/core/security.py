@@ -23,7 +23,37 @@ def _secret() -> str:
     return settings.JWT_SECRET
 
 
+_DEFAULT_ADMIN_PASSWORD = "admin123"
+_MIN_ADMIN_PASSWORD = 10
+
+
+def check_production_settings() -> None:
+    """Fail-fast для production: дефолтные секреты и слабый пароль админа.
+
+    Проверяется на старте приложения, а не при первом входе: иначе установка с
+    `admin123` живёт до первой попытки логина, а это уже рабочий контур.
+    В development проверка ничего не делает — иначе ломается первичный сид
+    администратора и прогон тестов.
+    """
+    if settings.LORAI_ENV.lower() not in ("prod", "production"):
+        return
+    problems = []
+    if settings.JWT_SECRET == _DEFAULT_SECRET:
+        problems.append("JWT_SECRET оставлен дефолтным")
+    if settings.ADMIN_PASSWORD == _DEFAULT_ADMIN_PASSWORD:
+        problems.append("ADMIN_PASSWORD оставлен дефолтным (admin123)")
+    elif len(settings.ADMIN_PASSWORD) < _MIN_ADMIN_PASSWORD:
+        problems.append(f"ADMIN_PASSWORD короче {_MIN_ADMIN_PASSWORD} символов")
+    if problems:
+        raise RuntimeError(
+            "Запуск в production запрещён: " + "; ".join(problems)
+            + ". Задайте значения в .env (см. .env.example)."
+        )
+
+
 def hash_pw(p: str) -> str: return pwd.hash(p)
+
+
 def verify_pw(p: str, h: str) -> bool: return pwd.verify(p, h)
 
 

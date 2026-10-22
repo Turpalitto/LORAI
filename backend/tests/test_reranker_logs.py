@@ -95,7 +95,8 @@ def test_retrieve_asks_for_more_candidates_only_when_enabled(monkeypatch):
     calls = {}
 
     class Store:
-        def search(self, query, k=6, filters=None, section_boost=None, general_cap=None):
+        def search(self, query, k=6, filters=None, section_boost=None, general_cap=None,
+                   nosology_boost=None):
             calls["k"] = k
             return _chunks(3)
 

@@ -100,9 +100,16 @@ def run(golden_path: str, k: int, threshold: float | None, show_fails: bool,
         "n_out_of_domain": len(out),
         "recall_at_k": round(len(hits) / max(1, len(ind)), 4),
         "mrr_at_k": round(mean([1.0 / r["rank"] for r in hits]) if hits else 0.0, 4),
+        # Тот же MRR, но промах считается за 0 по всем in-domain вопросам.
+        # Вариант «среднее по найденным» награждает ПРОПУСК: добавление
+        # попадания на 5-м месте снижает такую метрику, хотя поиск стал лучше.
+        # Обе цифры печатаем рядом, чтобы это было видно, а не спрятано.
+        "mrr_at_k_all": round(sum((1.0 / r["rank"]) for r in ind if r["rank"]) / max(1, len(ind)), 4),
         # MRR по «протокол + нужный раздел»: не награждает мусорный чанк того же
         # протокола (приказ Минздрава в разделе лечения) за первое место.
         "mrr_content_at_k": round(mean([1.0 / r["rank_content"] for r in content]) if content else 0.0, 4),
+        "mrr_content_at_k_all": round(
+            sum((1.0 / r["rank_content"]) for r in ind if r["rank_content"]) / max(1, len(ind)), 4),
         "recall_at_1": round(sum(1 for r in ind if r["rank"] == 1) / max(1, len(ind)), 4),
         "section_at_k": round(sum(1 for r in sec if r["section_hit"]) / max(1, len(sec)), 4),
         # Главная метрика содержания: и протокол верный, и нужный раздел в топ-k

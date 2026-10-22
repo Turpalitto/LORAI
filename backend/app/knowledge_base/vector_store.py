@@ -46,6 +46,19 @@ def _tok(s: str) -> list[str]:
     return re.findall(r"[а-яa-z0-9]+", (s or "").lower())
 
 
+def _norm_nos(s) -> str:
+    """Название нозологии для сравнения.
+
+    В индексе они пришли из первой страницы PDF и у 21 протокола из 22 несут
+    хвостовой пробел («Отит средний острый »). Из-за этого точное сравнение
+    не срабатывало ни в фильтре клиента (`filters={"nosology": ...}` — молча
+    отбрасывались все чанки), ни в бусте по нозологии. Сравниваем без
+    хвостовых пробелов и регистра, а не переиндексацией: старые индексы
+    должны работать как есть.
+    """
+    return " ".join(str(s or "").split()).casefold()
+
+
 class VectorStore:
     def __init__(self, persist_dir: str = "./data/vector_store"):
         self.dir = persist_dir
@@ -205,6 +218,11 @@ class VectorStore:
         if os.path.exists(p) and self.chroma is None:
             try: self.docs = pickle.load(open(p, "rb"))
             except Exception: self.docs = []
+        # Хвостовые пробелы в названии нозологии — дефект разбора PDF, а не
+        # данные. Чистим на загрузке, чтобы фильтр и выдача совпадали.
+        for d in self.docs:
+            if isinstance(d, dict) and d.get("nosology"):
+                d["nosology"] = " ".join(str(d["nosology"]).split())
         self._index_all()
 
     def _save(self):
@@ -263,10 +281,16 @@ class VectorStore:
     # ---------- поиск ----------
     def search(self, query: str, k: int = 6, filters: dict | None = None,
                section_boost: list[str] | None = None,
-               general_cap: int | None = None) -> list[dict]:
+               general_cap: int | None = None,
+               nosology_boost: str | None = None) -> list[dict]:
         """`section_boost` — разделы, которым отдаём приоритет при ранжировании
         (см. rag/retriever.section_hint). Буст влияет только на порядок: в поле
         score остаётся честное сходство, иначе гейт отказа начинал бы врать.
+
+        `nosology_boost` — нозология из вопроса (rag/retriever.nosology_hint).
+        Тем же множителем поднимаем чанки нужного протокола: косинусы соседних
+        нозологий отличаются на 0.005–0.01, и без явного приоритета лечение
+        синусита встаёт выше лечения отита.
 
         `general_cap` — сколько «обзорных» чанков (section=general) допустимо в
         топ-k, когда вопрос явно про раздел. Без ограничения топ забивается
@@ -287,11 +311,11 @@ class VectorStore:
         cap = general_cap if general_cap is not None else _general_cap()
         if self.backend == "embeddings" and self._model is not None and self.docs:
             try:
-                return self._search_embeddings(query, k, filters, section_boost, cap)
+                return self._search_embeddings(query, k, filters, section_boost, cap, nosology_boost)
             except Exception as e:
                 self.backend_note = f"поиск по эмбеддингам упал ({e}) — TF-IDF"
                 self.backend = "tfidf"
-        return self._search_tfidf(query, k, filters, section_boost, cap)
+        return self._search_tfidf(query, k, filters, section_boost, cap, nosology_boost)
 
     @staticmethod
     def _diversify(ranked: list[dict], k: int, general_cap: int | None,
@@ -336,7 +360,8 @@ class VectorStore:
 
     def _search_embeddings(self, query: str, k: int, filters: dict | None,
                            section_boost: list[str] | None = None,
-                           general_cap: int | None = None) -> list[dict]:
+                           general_cap: int | None = None,
+                           nosology_boost: str | None = None) -> list[dict]:
         if not (query or "").strip():
             return []
         self._ensure_vectors()
@@ -348,9 +373,13 @@ class VectorStore:
         if hybrid > 0:
             # ранжируем по смеси, но врачу и гейту отказа показываем честный косинус
             sims = sims + hybrid * self._tfidf_cosines(query)
-        if section_boost:
-            factor = _section_boost()
-            rank = np.array([float(s) * (factor if self.docs[i].get("section") in section_boost else 1.0)
+        if section_boost or nosology_boost:
+            s_factor = _section_boost() if section_boost else 1.0
+            n_factor = _nosology_boost() if nosology_boost else 1.0
+            n_target = _norm_nos(nosology_boost)
+            rank = np.array([float(s) * (s_factor if section_boost and self.docs[i].get("section") in section_boost else 1.0)
+                                      * (n_factor if nosology_boost and _norm_nos(self.docs[i].get("nosology")) == n_target
+                                                   and self.docs[i].get("section") != "appendix" else 1.0)
                              for i, s in enumerate(sims)], dtype=np.float32)
         else:
             rank = sims
@@ -360,7 +389,7 @@ class VectorStore:
         pool = max(k, k * 4)
         for i in order:
             d = self.docs[int(i)]
-            if filters and filters.get("nosology") and d.get("nosology") != filters["nosology"]:
+            if filters and filters.get("nosology") and _norm_nos(d.get("nosology")) != _norm_nos(filters["nosology"]):
                 continue
             if filters and filters.get("icd10") and filters["icd10"] not in str(d.get("icd10_codes", "")):
                 continue
@@ -374,7 +403,8 @@ class VectorStore:
 
     def _search_tfidf(self, query: str, k: int, filters: dict | None,
                       section_boost: list[str] | None = None,
-                      general_cap: int | None = None) -> list[dict]:
+                      general_cap: int | None = None,
+                      nosology_boost: str | None = None) -> list[dict]:
         # TF-IDF fallback (cosine). Токены, idf и нормы предвычислены
         # в _index_all; на запрос — только скалярные произведения O(N·|q|).
         if len(self._toks) != len(self.docs):
@@ -385,7 +415,7 @@ class VectorStore:
         qn = math.sqrt(sum((c * w_idf(w)) ** 2 for w, c in qt.items())) or 1
         sub = query.lower()[:20].strip()
         for d, ct, dn in zip(self.docs, self._ctrs, self._norms):
-            if filters and filters.get("nosology") and d.get("nosology") != filters["nosology"]: continue
+            if filters and filters.get("nosology") and _norm_nos(d.get("nosology")) != _norm_nos(filters["nosology"]): continue
             if filters and filters.get("icd10"):
                 if filters["icd10"] not in str(d.get("icd10_codes","")): continue
             dot = sum(qt[w] * ct[w] * (w_idf(w) ** 2) for w in qt if w in ct)
@@ -394,7 +424,11 @@ class VectorStore:
             # пустая строка входит в любой текст и раньше бустила все документы)
             if sub and sub in d["text"].lower(): s = min(1.0, s + 0.25)
             raw = round(float(s), 4)
-            scores.append((raw * self._boost_factor(d, section_boost),
+            rank_s = raw * self._boost_factor(d, section_boost)
+            if (nosology_boost and d.get("section") != "appendix"
+                    and _norm_nos(d.get("nosology")) == _norm_nos(nosology_boost)):
+                rank_s *= _nosology_boost()
+            scores.append((rank_s,
                            {"text": d["text"], "score": raw,
                             "document": d.get("title",""), "nosology": d.get("nosology",""),
                             "section": d.get("section",""), "page_range": d.get("page_range",[]),
@@ -430,6 +464,20 @@ def _section_boost() -> float:
 def _settings_boost() -> float:
     from ..core.config import settings
     return float(getattr(settings, "SECTION_BOOST", 1.15))
+
+
+def _nosology_boost() -> float:
+    """Во сколько раз поднять чанки нозологии, о которой спрашивают.
+
+    1.0 — выключено. Значение по умолчанию — измеренное (docs/RETRIEVAL_EVAL.md
+    §11): на hold-out прирост есть до ~1.2, дальше нозология начинает
+    перебивать раздел и в топ попадают не те главы.
+    """
+    try:
+        from ..core.config import settings
+        return float(os.getenv("NOSOLOGY_BOOST", "") or getattr(settings, "NOSOLOGY_BOOST", 1.15))
+    except Exception:
+        return 1.15
 
 
 def _hybrid_weight() -> float:

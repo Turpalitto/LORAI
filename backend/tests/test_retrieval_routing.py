@@ -46,7 +46,8 @@ class _StubStore:
     def __init__(self):
         self.seen_boost = "не вызван"
 
-    def search(self, query, k=6, filters=None, section_boost=None, general_cap=None):
+    def search(self, query, k=6, filters=None, section_boost=None, general_cap=None,
+                   nosology_boost=None):
         self.seen_boost = section_boost
         self.seen_cap = general_cap
         return [{"text": "x", "score": 0.5, "section": "treatment"}]

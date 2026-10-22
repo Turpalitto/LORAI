@@ -21,7 +21,7 @@ docker compose up --build
 | Слой | Где |
 |---|---|
 | API (FastAPI, роутеры) | `backend/app/routers/` — `/v1/...` |
-| Поиск: e5 + маршрутизация по разделам + опц. реранкер | `backend/app/rag/` |
+| Поиск: e5 + маршрутизация по разделам и нозологии + опц. реранкер | `backend/app/rag/` |
 | Разбор и проверка схем (PASS/REVIEW/REJECT) | `backend/app/clinical/` |
 | Ингест PDF → разделы → чанки | `backend/app/ingestion/` |
 | БД (SQLite/Postgres) + векторный индекс | `backend/app/knowledge_base/` |
@@ -46,8 +46,8 @@ cd frontend && npm test && npm run build
 `--basetemp` нужен только в песочнице, где запрещена запись в `/private/var/folders`.
 Маркер `slow` — тесты, поднимающие модель эмбеддингов.
 
-Актуальные цифры (1.8.0): backend 237 тестов (быстрый цикл `-m "not slow"` — 219),
-frontend 36 тестов, сборка 162.05 kB / 53.78 kB gzip. Время прогона backend сильно
+Актуальные цифры (1.9.0): backend 273 теста (быстрый цикл `-m "not slow"` — 255),
+frontend 39 тестов, сборка 162.08 kB / 53.79 kB gzip. Время прогона backend сильно
 зависит от машины и прогрева кэша модели — на этой машине от 1.5 до 8 минут, поэтому
 цифра в секундах здесь не фиксируется.
 
@@ -60,7 +60,12 @@ Frontend собирается только на Node из `.nvmrc` (24). На д
 ```bash
 python scripts/eval_retrieval.py --holdout --general-cap 2            # базовая линия
 python scripts/eval_retrieval.py --holdout --general-cap 2 --rerank   # с реранкером
+python scripts/eval_retrieval.py --golden data/eval/lor_retrieval_fresh.json --general-cap 2
 ```
+
+Третий набор (`lor_retrieval_fresh.json`) — для проверок, которые не должны быть
+in-sample: hold-out уже участвовал в разработке правил нозологии, golden — в
+калибровке разделов.
 
 Текущие цифры и оговорки: `docs/RETRIEVAL_EVAL.md`. Включение реранкера —
 `RERANK_BACKEND=cross` (по умолчанию выключен: модель ~700 МБ, +1 с на запрос).

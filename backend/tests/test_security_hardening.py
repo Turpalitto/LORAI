@@ -160,3 +160,54 @@ def test_latin_drug_name_is_detected():
     assert _DRUG_RX.search("amoxicillin 500 mg")
     assert _DRUG_RX.search("azithromycin")
     assert _DRUG_RX.search("амоксициллином")
+
+
+# ------------------------------------- H11: fail-fast только для JWT_SECRET
+def test_production_rejects_default_secrets(monkeypatch):
+    """В production дефолтные секреты — отказ старта, а не предупреждение.
+
+    Раньше проверялся только JWT_SECRET: установка с ADMIN_PASSWORD=admin123
+    поднималась в production и жила до первой попытки входа.
+    """
+    from app.core.config import settings
+    from app.core.security import check_production_settings
+
+    monkeypatch.setattr(settings, "LORAI_ENV", "production")
+    monkeypatch.setattr(settings, "JWT_SECRET", "change-me-in-production-please")
+    monkeypatch.setattr(settings, "ADMIN_PASSWORD", "admin123")
+    with pytest.raises(RuntimeError) as e:
+        check_production_settings()
+    assert "JWT_SECRET" in str(e.value)
+    assert "ADMIN_PASSWORD" in str(e.value)
+
+
+def test_production_rejects_short_admin_password(monkeypatch):
+    from app.core.config import settings
+    from app.core.security import check_production_settings
+
+    monkeypatch.setattr(settings, "LORAI_ENV", "production")
+    monkeypatch.setattr(settings, "JWT_SECRET", "x" * 40)
+    monkeypatch.setattr(settings, "ADMIN_PASSWORD", "short")
+    with pytest.raises(RuntimeError, match="ADMIN_PASSWORD"):
+        check_production_settings()
+
+
+def test_production_accepts_strong_settings(monkeypatch):
+    from app.core.config import settings
+    from app.core.security import check_production_settings
+
+    monkeypatch.setattr(settings, "LORAI_ENV", "production")
+    monkeypatch.setattr(settings, "JWT_SECRET", "x" * 40)
+    monkeypatch.setattr(settings, "ADMIN_PASSWORD", "n7Q!v2Lm9Pz")
+    check_production_settings()  # не должно бросить
+
+
+def test_development_allows_defaults(monkeypatch):
+    """Иначе ломается первичный сид админа и прогон тестов."""
+    from app.core.config import settings
+    from app.core.security import check_production_settings
+
+    monkeypatch.setattr(settings, "LORAI_ENV", "development")
+    monkeypatch.setattr(settings, "JWT_SECRET", "change-me-in-production-please")
+    monkeypatch.setattr(settings, "ADMIN_PASSWORD", "admin123")
+    check_production_settings()

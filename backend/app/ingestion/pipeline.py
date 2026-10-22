@@ -263,7 +263,10 @@ def process_pdf(path: str, llm_client=None, title: str | None = None,
     doc = {
         "document_id": document_id or str(uuid.uuid4()),
         "title": title or os.path.basename(path)[:200],
-        "nosology": (title or os.path.basename(path).split("_")[0].split(".")[0])[:200],
+        # .strip(): заголовок берётся с первой страницы PDF и почти всегда
+        # приходит с хвостовым переводом строки/пробелом — из-за этого фильтр
+        # по нозологии в API не находил ни одного чанка (см. vector_store._norm_nos).
+        "nosology": (title or os.path.basename(path).split("_")[0].split(".")[0]).strip()[:200],
         "icd10_codes": icd,
         "approval_year": int(year_m.group(0)) if year_m else 2024,
         "revision_year": None,

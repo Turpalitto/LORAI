@@ -23,11 +23,16 @@ from .core.logging import (get_request_id, log, reset_request_id,
                            sanitize_request_id, set_request_id)
 from .core.privacy import has_pii as _has_pii  # noqa: F401 (реэкспорт)
 from .core.ratelimit import limiter, rate_limit_handler
+from .core.security import check_production_settings
 from .knowledge_base import repository as repo
 from .routers import account, admin, chat, clinical, protocols, system
 from .routers import auth as auth_routes
 from .routers.auth import _LOGIN_FAILS  # noqa: F401 (реэкспорт для тестов)
 from .services.uploads import doc_lock as _doc_lock  # noqa: F401 (реэкспорт)
+
+# Fail-fast в production: дефолтные JWT_SECRET/ADMIN_PASSWORD запрещены.
+# В development проверка молчит, иначе ломается первичный сид админа.
+check_production_settings()
 
 app = FastAPI(title="LORAI — помощник ЛОР-врача")
 app.state.limiter = limiter

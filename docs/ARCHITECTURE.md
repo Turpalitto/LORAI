@@ -28,13 +28,19 @@ services/
 clinical/               normalizer.py + validator.py + data/{drugs,routes,units}.json (из antibio-calc)
 ingestion/              pdf_loader → table_parser → icd10 → llm_structurer → pipeline
 knowledge_base/         SQLAlchemy (Document, QueryLog, User, AuditLog) + VectorStore
-rag/                    intent → retrieval top-k → [reranker] → threshold → prompt → generator
-                        → анти-галлюцинация
+rag/                    intent → retrieval top-k (маршрутизация по разделу и нозологии)
+                        → [reranker] → threshold → prompt → generator → анти-галлюцинация
 ```
 
 Версионирование: роутеры монтируются дважды — `/v1/...` (канонический путь, попадает
 в OpenAPI) и без префикса (совместимость, помечен `Deprecation` + `Link` на `/v1`,
 из схемы скрыт). `/health` — вне версий, это операционный эндпоинт.
+
+Маршрутизация: `retriever.section_hint` выбирает раздел протокола (лечение,
+диагностика, профилактика…), `retriever.nosology_hint` — сам протокол по тексту
+вопроса. Оба дают множитель к ранжированию (`SECTION_BOOST`, `NOSOLOGY_BOOST`), не
+меняя `score`. Если нозология не распознана однозначно, буст не применяется —
+неверный протокол хуже отсутствия подсказки (см. `docs/RETRIEVAL_EVAL.md` §11).
 
 Реранкер (`rag/reranker.py`) выключен по умолчанию: включается `RERANK_BACKEND=cross`
 после замера на hold-out (см. `docs/RETRIEVAL_EVAL.md` §реранкер). Он меняет только

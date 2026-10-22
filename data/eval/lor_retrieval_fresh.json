@@ -1,0 +1,160 @@
+{
+  "version": "2026-10-22",
+  "note": "Свежий набор для проверки маршрутизации по нозологии (1.9.0). Составлен после того, как правила детектора были написаны, поэтому это НЕ независимый тест качества правил — это проверка, что прирост не держится на формулировках hold-out. Вопросы сюда добавлять, а не в golden; на этом наборе правила не подгонять.",
+  "items": [
+    {
+      "id": "f-naruzh-1",
+      "q": "болит ухо при нажатии на козелок, плавал в бассейне",
+      "protocols": ["Наружные отиты"],
+      "sections": ["treatment", "diagnostics"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-laringit-1",
+      "q": "после гриппа пропал голос, при ларингоскопии отёк",
+      "protocols": ["Острый ларингит"],
+      "sections": ["treatment", "diagnostics"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-adenoidy-1",
+      "q": "мальчик 4 лет храпит во сне и дышит ртом",
+      "protocols": ["Гипертрофия аденоидов"],
+      "sections": ["diagnostics", "treatment"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-shum-1",
+      "q": "постоянный писк в ухе, слух упал после десяти лет в котельной",
+      "protocols": ["Потеря слуха, вызванная шумом"],
+      "sections": ["diagnostics", "prevention"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-polip-1",
+      "q": "полипы в носу, обоняние пропало полностью",
+      "protocols": ["Полипозный риносинусит"],
+      "sections": ["treatment", "diagnostics"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-pereg-1",
+      "q": "искривление носовой перегородки, дышит только правой ноздрёй",
+      "protocols": ["Деформация перегородки носа"],
+      "sections": ["diagnostics", "treatment"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-tonz-hron-1",
+      "q": "хронический тонзиллит: ангины четыре раза в год",
+      "protocols": ["Хронический тонзиллит"],
+      "sections": ["treatment", "referral_criteria"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-tonz-ostr-1",
+      "q": "ангина с гнойным налётом, температура 39, чем лечить",
+      "protocols": ["Острый тонзиллит и фарингит"],
+      "sections": ["treatment"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-otoskleroz-1",
+      "q": "отосклероз: кондуктивная тугоухость, какое вмешательство показано",
+      "protocols": ["Отосклероз"],
+      "sections": ["treatment", "referral_criteria"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-otit-1",
+      "q": "после ОРВИ отит у ребёнка, перепонка выбухает",
+      "protocols": ["Отит средний острый"],
+      "sections": ["treatment", "diagnostics"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-hron-otit-1",
+      "q": "хронический отит с холестеатомой, что делать с операцией",
+      "protocols": ["Хронический средний отит"],
+      "sections": ["treatment", "referral_criteria"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-travma-nosa-1",
+      "q": "травма носа с гематомой перегородки",
+      "protocols": ["Травма носа"],
+      "sections": ["diagnostics", "treatment"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-krup-1",
+      "q": "круп у ребёнка: сиплый голос и свистящее дыхание",
+      "protocols": ["Острый обструктивный ларингит"],
+      "sections": ["treatment", "diagnostics"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-paratonz-1",
+      "q": "паратонзиллярный абсцесс, асимметрия зева",
+      "protocols": ["Паратонзиллярный абсцесс"],
+      "sections": ["diagnostics", "treatment"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-nst-1",
+      "q": "сенсоневральная потеря слуха, нужен ли слуховой аппарат",
+      "protocols": ["Нейросенсорная тугоухость"],
+      "sections": ["treatment", "diagnostics"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-gribok-1",
+      "q": "отомикоз после капель с антибиотиками",
+      "protocols": ["Грибковый отит"],
+      "sections": ["treatment", "diagnostics"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-allerg-1",
+      "q": "весенний аллергический ринит, зуд в носу и слёзы",
+      "protocols": ["Аллергический ринит"],
+      "sections": ["treatment", "diagnostics"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-sinusit-1",
+      "q": "синусит: боль в области гайморовой пазухи, температура",
+      "protocols": ["Острый синусит"],
+      "sections": ["diagnostics", "treatment"],
+      "kind": "in_domain"
+    },
+    {
+      "id": "f-out-podagra",
+      "q": "подагра: как снизить мочевую кислоту",
+      "protocols": [],
+      "sections": null,
+      "kind": "out_of_domain"
+    },
+    {
+      "id": "f-out-anemiya",
+      "q": "железодефицитная анемия у взрослого: препараты железа",
+      "protocols": [],
+      "sections": null,
+      "kind": "out_of_domain"
+    },
+    {
+      "id": "f-out-osteohondroz",
+      "q": "остеохондроз поясницы: боль в спине, чем лечить",
+      "protocols": [],
+      "sections": null,
+      "kind": "out_of_domain"
+    },
+    {
+      "id": "f-out-gipertoniya",
+      "q": "гипертония: целевые цифры артериального давления",
+      "protocols": [],
+      "sections": null,
+      "kind": "out_of_domain"
+    }
+  ]
+}
