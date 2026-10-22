@@ -67,6 +67,10 @@ python scripts/eval_retrieval.py --golden data/eval/lor_retrieval_fresh.json --g
 in-sample: hold-out уже участвовал в разработке правил нозологии, golden — в
 калибровке разделов.
 
+Гейт целиком (оба набора + инварианты) — `scripts/check_retrieval_gate.sh`. В GitHub
+Actions его нет: там нет корпуса КР (PDF не коммитятся), поэтому push-CI проверяет
+код (backend, frontend, e2e на синтетике), а качество поиска — на машине с корпусом.
+
 Текущие цифры и оговорки: `docs/RETRIEVAL_EVAL.md`. Включение реранкера —
 `RERANK_BACKEND=cross` (по умолчанию выключен: модель ~700 МБ, +1 с на запрос).
 
