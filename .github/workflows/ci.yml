@@ -54,27 +54,38 @@ jobs:
         run: |
           RERANK_BACKEND=off VECTOR_BACKEND=embeddings python scripts/eval_retrieval.py \
             --holdout --k 6 --general-cap 2 --json eval_holdout.json
+      # Свежий набор: правила распознавания нозологии писались при видимом
+      # hold-out, поэтому регресс на новых формулировках hold-out не покажет.
+      - name: Замер на свежем наборе
+        run: |
+          RERANK_BACKEND=off VECTOR_BACKEND=embeddings python scripts/eval_retrieval.py \
+            --golden data/eval/lor_retrieval_fresh.json --k 6 --general-cap 2 \
+            --json eval_fresh.json
       - name: Инварианты качества
         run: |
           python - <<'PY'
           import json, sys
-          s = json.load(open("eval_holdout.json"))["summary"]
-          print({k: s[k] for k in ("recall_at_k", "protocol_and_section_at_k",
-                                    "false_refusal_rate", "out_refusal_rate")})
           bad = []
-          if s["false_refusal_rate"] > 0:
-              bad.append("ложные отказы на in-domain вопросах")
-          if s["out_refusal_rate"] < 1.0:
-              bad.append("вне-доменный вопрос не отсечён")
-          if s["recall_at_k"] < 0.85:
-              bad.append("recall@6 ниже 0.85")
+          for name, path in (("hold-out", "eval_holdout.json"),
+                             ("fresh", "eval_fresh.json")):
+              s = json.load(open(path))["summary"]
+              print(name, {k: s[k] for k in ("recall_at_k", "protocol_and_section_at_k",
+                                             "false_refusal_rate", "out_refusal_rate")})
+              if s["false_refusal_rate"] > 0:
+                  bad.append(f"{name}: ложные отказы на in-domain вопросах")
+              if s["out_refusal_rate"] < 1.0:
+                  bad.append(f"{name}: вне-доменный вопрос не отсечён")
+              if s["recall_at_k"] < 0.85:
+                  bad.append(f"{name}: recall@6 ниже 0.85")
           sys.exit("; ".join(bad) if bad else 0)
           PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: eval-holdout
-          path: eval_holdout.json
+          name: eval-reports
+          path: |
+            eval_holdout.json
+            eval_fresh.json
   e2e:
     runs-on: ubuntu-latest
     steps:
