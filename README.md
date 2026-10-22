@@ -46,7 +46,7 @@ cd frontend && npm test && npm run build
 `--basetemp` нужен только в песочнице, где запрещена запись в `/private/var/folders`.
 Маркер `slow` — тесты, поднимающие модель эмбеддингов.
 
-Актуальные цифры (1.10.0): backend 285 тестов (быстрый цикл `-m "not slow"` — 267),
+Актуальные цифры (1.11.0): backend 301 тест (быстрый цикл `-m "not slow"` — 283),
 frontend 39 тестов, сборка 162.08 kB / 53.79 kB gzip. Время прогона backend сильно
 зависит от машины и прогрева кэша модели — на этой машине от 1.5 до 8 минут, поэтому
 цифра в секундах здесь не фиксируется.
@@ -61,11 +61,13 @@ Frontend собирается только на Node из `.nvmrc` (24). На д
 python scripts/eval_retrieval.py --holdout --general-cap 2            # базовая линия
 python scripts/eval_retrieval.py --holdout --general-cap 2 --rerank   # с реранкером
 python scripts/eval_retrieval.py --golden data/eval/lor_retrieval_fresh.json --general-cap 2
+python scripts/eval_retrieval.py --golden data/eval/lor_retrieval_symptoms.json --general-cap 2
 ```
 
 Третий набор (`lor_retrieval_fresh.json`) — для проверок, которые не должны быть
 in-sample: hold-out уже участвовал в разработке правил нозологии, golden — в
-калибровке разделов.
+калибровке разделов. Четвёртый (`lor_retrieval_symptoms.json`) — вопросы без
+названия болезни; там же четыре вне-доменных ловушки для правил симптомов.
 
 Гейт целиком (оба набора + инварианты) — `scripts/check_retrieval_gate.sh`. В GitHub
 Actions его нет: там нет корпуса КР (PDF не коммитятся), поэтому push-CI проверяет

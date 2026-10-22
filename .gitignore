@@ -26,5 +26,4 @@ lorai.db.bak-*
 .workbuddy-ai/
 
 # отчёты scripts/eval_retrieval.py (локальный гейт, не артефакт репозитория)
-eval_holdout.json
-eval_fresh.json
+eval_*.json

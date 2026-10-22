@@ -11,7 +11,7 @@ export const API = apiBase((import.meta as any).env.VITE_API_URL);
 /* Версия контракта: канонические пути живут под /v1 (backend монтирует роутеры
    дважды — /v1 и legacy без префикса, который помечен Deprecation). */
 export const API_PREFIX = '/v1';
-export const APP_VERSION = '1.10.0';
+export const APP_VERSION = '1.11.0';
 export const DISC =
   'Справочный инструмент для врача. Решение принимает врач. Не вводите персональные данные пациента (ФИО, телефон, паспорт, СНИЛС).';
 

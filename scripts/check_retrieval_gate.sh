@@ -24,5 +24,9 @@ echo "== свежий набор (не in-sample для правил нозол�
 "$PYTHON" scripts/eval_retrieval.py \
   --golden data/eval/lor_retrieval_fresh.json --k 6 --general-cap 2 --json eval_fresh.json
 
+echo "== вопросы без названия болезни =="
+"$PYTHON" scripts/eval_retrieval.py \
+  --golden data/eval/lor_retrieval_symptoms.json --k 6 --general-cap 2 --json eval_symptoms.json
+
 echo "== инварианты =="
-"$PYTHON" scripts/check_eval_invariants.py eval_holdout.json eval_fresh.json
+"$PYTHON" scripts/check_eval_invariants.py eval_holdout.json eval_fresh.json eval_symptoms.json
